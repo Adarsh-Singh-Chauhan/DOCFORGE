@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
   MessageSquare, Search, Trash2, Download, ArrowRight,
-  ChevronLeft, ChevronRight, RefreshCw, FileText,
+  RefreshCw, FileText,
   Paperclip, Send, Layers, TrendingUp, MoreHorizontal,
-  ExternalLink, Plus, BookOpen
+  BookOpen
 } from 'lucide-react'
 import type { ChatConversation } from '../types'
 import { fetchChatHistory, deleteConversation, fetchChatConversation } from '../services/historyApi'
@@ -540,9 +540,12 @@ export default function ChatHistoryPage({ onNavigate }: Props) {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                     <span style={{ color: 'var(--accent, #e04f16)', fontSize: '1.2rem', marginTop: '2px' }}>📄</span>
                     <div>
-                      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 900, margin: 0, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                        {activeConv.title}
-                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 900, margin: 0, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                          {activeConv.title}
+                        </h2>
+                        {detailLoading && <RefreshCw size={13} className="animate-spin" color="var(--accent, #e04f16)" />}
+                      </div>
                     </div>
                   </div>
 

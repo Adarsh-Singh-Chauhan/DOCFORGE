@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
-  FileText, CheckCircle2, AlertTriangle, MessageSquare, Clock,
+  FileText, MessageSquare, Clock,
   RefreshCw, Layers, BarChart2, Eye, Download, MoreHorizontal,
   Cpu
 } from 'lucide-react'
-import type { DashboardStats, OcrHistoryRecord } from '../types'
+import type { DashboardStats } from '../types'
 import { fetchDashboardStats } from '../services/historyApi'
 
 interface Props {
@@ -499,7 +499,7 @@ export default function DashboardPage({ onNavigate }: Props) {
             <div style={{ width: '100%', height: '210px', position: 'relative' }}>
               <svg width="100%" height="100%" viewBox="0 0 520 200" preserveAspectRatio="none">
                 {/* Y-Axis Grid Lines & Labels */}
-                {[0, 100, 200, 300, 400, 500].map((val, idx) => {
+                {[0, 100, 200, 300, 400, 500].map((val) => {
                   const y = 170 - (val / 500) * 140
                   const jobVal = (val / 500) * 40
                   return (
@@ -623,7 +623,7 @@ export default function DashboardPage({ onNavigate }: Props) {
             <div style={{ width: '100%', height: '210px', position: 'relative' }}>
               <svg width="100%" height="100%" viewBox="0 0 520 200" preserveAspectRatio="none">
                 {/* Y-Axis Grid Lines & Labels */}
-                {[0, 5, 10, 15, 20].map((val, idx) => {
+                {[0, 5, 10, 15, 20].map((val) => {
                   const y = 170 - (val / 20) * 140
                   const msgVal = (val / 20) * 80
                   return (

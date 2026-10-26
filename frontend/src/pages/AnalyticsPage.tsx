@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
-  Cpu, ShieldCheck, DollarSign, RefreshCw, Key,
-  CheckCircle2, AlertTriangle, Layers, Eye, EyeOff, MoreHorizontal,
+  Cpu, DollarSign, RefreshCw, Key,
+  Layers, Eye, EyeOff, MoreHorizontal,
   Cloud, Server, Check
 } from 'lucide-react'
 import type { EngineAnalytics, DocumentEngine } from '../types'
@@ -422,8 +422,8 @@ export default function AnalyticsPage({ onOpenSettings, onNavigate }: Props) {
                   <span style={{ fontWeight: 900, color: '#ea580c', fontSize: '1.1rem' }}>M</span>
                   <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>Mistral OCR</strong>
                 </div>
-                <span style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800 }}>
-                  ✓ CONFIGURED
+                <span style={{ padding: '3px 8px', borderRadius: '4px', background: isMistralConfigured ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', color: isMistralConfigured ? '#10b981' : '#ef4444', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800 }}>
+                  {isMistralConfigured ? '✓ CONFIGURED' : '⚠ NOT CONFIGURED'}
                 </span>
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '10px' }}>
@@ -466,8 +466,8 @@ export default function AnalyticsPage({ onOpenSettings, onNavigate }: Props) {
                   <span style={{ fontWeight: 900, color: '#a855f7', fontSize: '1.1rem' }}>M</span>
                   <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>Mathpix OCR</strong>
                 </div>
-                <span style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800 }}>
-                  ✓ CONFIGURED
+                <span style={{ padding: '3px 8px', borderRadius: '4px', background: isMathpixConfigured ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', color: isMathpixConfigured ? '#10b981' : '#ef4444', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800 }}>
+                  {isMathpixConfigured ? '✓ CONFIGURED' : '⚠ NOT CONFIGURED'}
                 </span>
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '10px' }}>

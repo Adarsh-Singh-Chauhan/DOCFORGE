@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   FileText, Search, Download, RotateCw, CheckCircle2, AlertTriangle,
-  ExternalLink, ChevronLeft, ChevronRight, Eye, RefreshCw, Clock,
+  ExternalLink, Eye, RefreshCw, Clock,
   MoreHorizontal, RotateCcw
 } from 'lucide-react'
 import type { OcrHistoryRecord } from '../types'
-import { fetchOcrHistory, deleteOcrJob, retryOcrJob } from '../services/historyApi'
+import { fetchOcrHistory, retryOcrJob } from '../services/historyApi'
 
 interface Props {
   onNavigate: (tab: string, param?: string) => void
@@ -446,6 +446,7 @@ export default function OcrHistoryPage({ onNavigate }: Props) {
               <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 800, margin: 0, textTransform: 'uppercase' }}>
                 OCR Job Registry
               </h3>
+              {loading && <RotateCw size={13} className="animate-spin" color="var(--accent, #e04f16)" />}
             </div>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted)' }}>
               Showing {recordsToDisplay.length} of {total.toLocaleString()} jobs
