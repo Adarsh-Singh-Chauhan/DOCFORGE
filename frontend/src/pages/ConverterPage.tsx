@@ -1640,14 +1640,38 @@ $$`}
                     </label>
                   )}
 
-                  <label className="aarambh-toggle" style={{ margin: 0 }}>
-                    <input
-                      type="checkbox"
-                      checked={forceOcr}
-                      onChange={e => setForceOcr(e.target.checked)}
-                    />
-                    <span>FORCE FULL OCR</span>
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="mono-tag" style={{ fontSize: '10px' }}>MODE:</span>
+                      <select
+                        value={mode}
+                        onChange={e => setMode(e.target.value)}
+                        style={{
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-primary)',
+                          padding: '4px 8px',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '11px',
+                          borderRadius: '4px',
+                        }}
+                        title="Inference mode: Auto (smart default), Balanced (speed & fidelity), or Fast"
+                      >
+                        <option value="auto">AUTO</option>
+                        <option value="balanced">BALANCED</option>
+                        <option value="fast">FAST</option>
+                      </select>
+                    </div>
+
+                    <label className="aarambh-toggle" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={forceOcr}
+                        onChange={e => setForceOcr(e.target.checked)}
+                      />
+                      <span>FORCE FULL OCR</span>
+                    </label>
+                  </div>
                 </div>
 
                 {batchFiles.length > 0 && (
