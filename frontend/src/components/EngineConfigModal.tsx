@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Check, Key, ShieldCheck, Cpu, Sparkles, Layers, Binary, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react'
+import { X, Check, Key, ShieldCheck, Cpu, Sparkles, RefreshCw, ExternalLink } from 'lucide-react'
 import type { DocumentEngine } from '../types'
 
 interface Props {
@@ -210,121 +210,80 @@ export default function EngineConfigModal({ isOpen, onClose, onSaved }: Props) {
             DOCFORGE supports <strong>IBM Docling</strong> and <strong>Surya VLM</strong> locally without any cloud credentials. Cloud providers (<strong>Mistral OCR</strong>, <strong>Mathpix</strong>, <strong>LlamaParse</strong>) are optional and require explicit consent before documents leave your workstation.
           </p>
 
-          <form onSubmit={handleSave}>
-            {/* 1. Local Providers Box */}
-            <div style={{ marginBottom: '1.5rem', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', background: 'var(--bg-elevated)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Cpu size={14} style={{ color: 'var(--accent)' }} />
-                AIR-GAPPED LOCAL ENGINES (NO API KEYS NEEDED)
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
-                {/* Docling */}
-                <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>IBM Docling</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: '#10b981', fontWeight: 700 }}>● ACTIVE</span>
-                  </div>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                    Local PDF unwarping, layout analysis, and tables. 100% private.
-                  </p>
-                </div>
-
-                {/* Surya */}
-                <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Surya VLM OCR</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: '#10b981', fontWeight: 700 }}>● ACTIVE</span>
-                  </div>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                    Deep vision-language optical OCR on GPU/CPU for scanned papers.
-                  </p>
-                </div>
-              </div>
+          {loading ? (
+            <div style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <RefreshCw size={14} className="aarambh-spinner" /> LOADING ENGINE CONFIGURATION...
             </div>
-
-            {/* 2. Optional Cloud API Providers */}
-            <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={14} style={{ color: 'var(--accent)' }} />
-                OPTIONAL CLOUD ENGINES (STORED SECURELY IN BACKEND .ENV)
-              </div>
-
-              {/* Provider 1: Mistral OCR */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', background: 'var(--bg-card)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Mistral OCR API</span>
-                    <a href="https://docs.mistral.ai/api/endpoint/ocr" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      Docs <ExternalLink size={10} />
-                    </a>
+          ) : (
+            <form onSubmit={handleSave}>
+              {/* 1. Local Providers Box */}
+              <div style={{ marginBottom: '1.5rem', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', background: 'var(--bg-elevated)' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Cpu size={14} style={{ color: 'var(--accent)' }} />
+                  AIR-GAPPED LOCAL ENGINES (NO API KEYS NEEDED)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                  {/* Docling */}
+                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>IBM Docling</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: '#10b981', fontWeight: 700 }}>● ACTIVE</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      Local PDF unwarping, layout analysis, and tables. 100% private.
+                    </p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: engines.find(e => e.id === 'mistral')?.configured ? '#10b981' : 'var(--text-muted)' }}>
-                      {engines.find(e => e.id === 'mistral')?.configured ? '● CONFIGURED' : '○ NOT CONFIGURED'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => testProvider('mistral')}
-                      className="btn-aarambh-outline"
-                      style={{ padding: '3px 8px', fontSize: '10px' }}
-                    >
-                      {testingId === 'mistral' ? 'TESTING...' : 'TEST'}
-                    </button>
+
+                  {/* Surya */}
+                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Surya VLM OCR</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: '#10b981', fontWeight: 700 }}>● ACTIVE</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      Deep vision-language optical OCR on GPU/CPU for scanned papers.
+                    </p>
                   </div>
                 </div>
-                <input
-                  type="password"
-                  placeholder="MISTRAL_API_KEY (leave empty to keep existing)"
-                  value={mistralKey}
-                  onChange={e => setMistralKey(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    color: 'var(--text-primary)'
-                  }}
-                />
-                {testStatus.mistral && (
-                  <div style={{ fontSize: '11px', marginTop: '6px', color: testStatus.mistral.ok ? '#10b981' : '#ef4444' }}>
-                    {testStatus.mistral.message}
-                  </div>
-                )}
               </div>
 
-              {/* Provider 2: Mathpix OCR */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', background: 'var(--bg-card)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Mathpix OCR API</span>
-                    <a href="https://docs.mathpix.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      Docs <ExternalLink size={10} />
-                    </a>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: engines.find(e => e.id === 'mathpix')?.configured ? '#10b981' : 'var(--text-muted)' }}>
-                      {engines.find(e => e.id === 'mathpix')?.configured ? '● CONFIGURED' : '○ NOT CONFIGURED'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => testProvider('mathpix')}
-                      className="btn-aarambh-outline"
-                      style={{ padding: '3px 8px', fontSize: '10px' }}
-                    >
-                      {testingId === 'mathpix' ? 'TESTING...' : 'TEST'}
-                    </button>
-                  </div>
+              {/* 2. Optional Cloud API Providers */}
+              <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={14} style={{ color: 'var(--accent)' }} />
+                  OPTIONAL CLOUD ENGINES (STORED SECURELY IN BACKEND .ENV)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+
+                {/* Provider 1: Mistral OCR */}
+                <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', background: 'var(--bg-card)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Mistral OCR API</span>
+                      <a href="https://docs.mistral.ai/api/endpoint/ocr" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        Docs <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: engines.find(e => e.id === 'mistral')?.configured ? '#10b981' : 'var(--text-muted)' }}>
+                        {engines.find(e => e.id === 'mistral')?.configured ? '● CONFIGURED' : '○ NOT CONFIGURED'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => testProvider('mistral')}
+                        className="btn-aarambh-outline"
+                        style={{ padding: '3px 8px', fontSize: '10px' }}
+                      >
+                        {testingId === 'mistral' ? 'TESTING...' : 'TEST'}
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="password"
-                    placeholder="MATHPIX_APP_ID"
-                    value={mathpixAppId}
-                    onChange={e => setMathpixAppId(e.target.value)}
+                    placeholder="MISTRAL_API_KEY (leave empty to keep existing)"
+                    value={mistralKey}
+                    onChange={e => setMistralKey(e.target.value)}
                     style={{
+                      width: '100%',
                       padding: '8px 12px',
                       fontFamily: 'var(--font-mono)',
                       fontSize: '12px',
@@ -334,110 +293,157 @@ export default function EngineConfigModal({ isOpen, onClose, onSaved }: Props) {
                       color: 'var(--text-primary)'
                     }}
                   />
-                  <input
-                    type="password"
-                    placeholder="MATHPIX_APP_KEY"
-                    value={mathpixAppKey}
-                    onChange={e => setMathpixAppKey(e.target.value)}
-                    style={{
-                      padding: '8px 12px',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '12px',
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
-                </div>
-                {testStatus.mathpix && (
-                  <div style={{ fontSize: '11px', marginTop: '6px', color: testStatus.mathpix.ok ? '#10b981' : '#ef4444' }}>
-                    {testStatus.mathpix.message}
-                  </div>
-                )}
-              </div>
-
-              {/* Provider 3: LlamaParse */}
-              <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', background: 'var(--bg-card)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>LlamaParse API</span>
-                    <a href="https://developers.llamaindex.ai/llamaparse/parse/getting_started/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      Docs <ExternalLink size={10} />
-                    </a>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: engines.find(e => e.id === 'llamaparse')?.configured ? '#10b981' : 'var(--text-muted)' }}>
-                      {engines.find(e => e.id === 'llamaparse')?.configured ? '● CONFIGURED' : '○ NOT CONFIGURED'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => testProvider('llamaparse')}
-                      className="btn-aarambh-outline"
-                      style={{ padding: '3px 8px', fontSize: '10px' }}
-                    >
-                      {testingId === 'llamaparse' ? 'TESTING...' : 'TEST'}
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="password"
-                  placeholder="LLAMA_CLOUD_API_KEY (leave empty to keep existing)"
-                  value={llamaKey}
-                  onChange={e => setLlamaKey(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    color: 'var(--text-primary)'
-                  }}
-                />
-                {testStatus.llamaparse && (
-                  <div style={{ fontSize: '11px', marginTop: '6px', color: testStatus.llamaparse.ok ? '#10b981' : '#ef4444' }}>
-                    {testStatus.llamaparse.message}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                <Key size={13} style={{ color: 'var(--accent)' }} />
-                Keys are never logged or exposed in client bundles.
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
-                  className="btn-aarambh-outline"
-                  onClick={onClose}
-                >
-                  CANCEL
-                </button>
-                <button
-                  type="submit"
-                  className="btn-aarambh-primary"
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <>
-                      <RefreshCw size={13} className="aarambh-spinner" /> SAVING...
-                    </>
-                  ) : savedSuccess ? (
-                    <>
-                      <Check size={13} /> SAVED SECURELY
-                    </>
-                  ) : (
-                    'SAVE CONFIGURATION'
+                  {testStatus.mistral && (
+                    <div style={{ fontSize: '11px', marginTop: '6px', color: testStatus.mistral.ok ? '#10b981' : '#ef4444' }}>
+                      {testStatus.mistral.message}
+                    </div>
                   )}
-                </button>
+                </div>
+
+                {/* Provider 2: Mathpix OCR */}
+                <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', background: 'var(--bg-card)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Mathpix OCR API</span>
+                      <a href="https://docs.mathpix.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        Docs <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: engines.find(e => e.id === 'mathpix')?.configured ? '#10b981' : 'var(--text-muted)' }}>
+                        {engines.find(e => e.id === 'mathpix')?.configured ? '● CONFIGURED' : '○ NOT CONFIGURED'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => testProvider('mathpix')}
+                        className="btn-aarambh-outline"
+                        style={{ padding: '3px 8px', fontSize: '10px' }}
+                      >
+                        {testingId === 'mathpix' ? 'TESTING...' : 'TEST'}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                    <input
+                      type="password"
+                      placeholder="MATHPIX_APP_ID"
+                      value={mathpixAppId}
+                      onChange={e => setMathpixAppId(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '12px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        color: 'var(--text-primary)'
+                      }}
+                    />
+                    <input
+                      type="password"
+                      placeholder="MATHPIX_APP_KEY"
+                      value={mathpixAppKey}
+                      onChange={e => setMathpixAppKey(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '12px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        color: 'var(--text-primary)'
+                      }}
+                    />
+                  </div>
+                  {testStatus.mathpix && (
+                    <div style={{ fontSize: '11px', marginTop: '6px', color: testStatus.mathpix.ok ? '#10b981' : '#ef4444' }}>
+                      {testStatus.mathpix.message}
+                    </div>
+                  )}
+                </div>
+
+                {/* Provider 3: LlamaParse */}
+                <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', background: 'var(--bg-card)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>LlamaParse API</span>
+                      <a href="https://developers.llamaindex.ai/llamaparse/parse/getting_started/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        Docs <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: engines.find(e => e.id === 'llamaparse')?.configured ? '#10b981' : 'var(--text-muted)' }}>
+                        {engines.find(e => e.id === 'llamaparse')?.configured ? '● CONFIGURED' : '○ NOT CONFIGURED'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => testProvider('llamaparse')}
+                        className="btn-aarambh-outline"
+                        style={{ padding: '3px 8px', fontSize: '10px' }}
+                      >
+                        {testingId === 'llamaparse' ? 'TESTING...' : 'TEST'}
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="LLAMA_CLOUD_API_KEY (leave empty to keep existing)"
+                    value={llamaKey}
+                    onChange={e => setLlamaKey(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {testStatus.llamaparse && (
+                    <div style={{ fontSize: '11px', marginTop: '6px', color: testStatus.llamaparse.ok ? '#10b981' : '#ef4444' }}>
+                      {testStatus.llamaparse.message}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </form>
+
+              {/* Bottom Actions */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  <Key size={13} style={{ color: 'var(--accent)' }} />
+                  Keys are never logged or exposed in client bundles.
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn-aarambh-outline"
+                    onClick={onClose}
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-aarambh-primary"
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <RefreshCw size={13} className="aarambh-spinner" /> SAVING...
+                      </>
+                    ) : savedSuccess ? (
+                      <>
+                        <Check size={13} /> SAVED SECURELY
+                      </>
+                    ) : (
+                      'SAVE CONFIGURATION'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Upload, FileText, Copy, Download, Check, X,
-  ArrowRight, Layers, MessageSquare, Trash2, Plus, CheckCircle2, AlertCircle, FileCheck,
-  RotateCw, Scan, Play, Pause, Activity, AlignLeft, FileCode, Table, Image,
-  Gauge, Monitor, Cpu, Zap, Settings, ShieldCheck, Sparkles, Binary
+  ArrowRight, Layers, MessageSquare, Trash2, Plus, CheckCircle2, FileCheck,
+  RotateCw, Scan, Play, Pause, AlignLeft, FileCode, Table, Image,
+  Gauge, Monitor, Cpu, Zap, Settings, ShieldCheck
 } from 'lucide-react'
-import type { ConvertResult, BatchFileItem, DocumentEngine } from '../types'
+import type { ConvertResult, BatchFileItem } from '../types'
 import TokenSavingsPanel from '../components/TokenSavingsPanel'
 import EngineConfigModal from '../components/EngineConfigModal'
 

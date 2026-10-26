@@ -407,6 +407,7 @@ Ask any question about your documents. Every response is **strictly grounded in 
       const answer = await queryGeminiAI({
         query: q,
         chunks: contextChunks,
+        chatHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
       })
 
       setMessages(prev => [

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  Cpu, Zap, ShieldCheck, DollarSign, Clock, Layers, ArrowUpRight,
-  CheckCircle2, AlertTriangle, RefreshCw, Settings, Sparkles, Binary
+  Cpu, ShieldCheck, DollarSign, RefreshCw, Settings
 } from 'lucide-react'
 import type { EngineAnalytics, DocumentEngine } from '../types'
 import { fetchEngineAnalytics } from '../services/historyApi'

@@ -78,6 +78,10 @@ CRITICAL INSTRUCTIONS:
         },
         body: JSON.stringify({
           contents: [
+            ...chatHistory.map(h => ({
+              role: h.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: h.content }],
+            })),
             {
               role: 'user',
               parts: [{ text: `${systemInstruction}\n\n${promptText}` }],

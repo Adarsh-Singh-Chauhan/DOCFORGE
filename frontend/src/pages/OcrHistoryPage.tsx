@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
-  FileText, Search, Download, Trash2, RotateCw, Filter, ArrowUpDown,
-  CheckCircle2, AlertTriangle, Clock, Layers, ExternalLink, ChevronLeft, ChevronRight,
+  FileText, Search, Download, Trash2, RotateCw, ArrowUpDown,
+  CheckCircle2, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight,
   Eye, RefreshCw, MessageSquare
 } from 'lucide-react'
 import type { OcrHistoryRecord } from '../types'
@@ -508,12 +508,26 @@ export default function OcrHistoryPage({ onNavigate, onOpenRagChatbot }: Props) 
           </div>
 
           {/* Pagination Footer */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
                 SHOWING PAGE {page} OF {totalPages} ({total} TOTAL RECORDS)
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="mono-tag" style={{ fontSize: '10px' }}>PER PAGE:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '3px 6px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+                >
+                  <option value={15}>15</option>
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                </select>
               </div>
+            </div>
 
+            {totalPages > 1 && (
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button
                   disabled={page <= 1}
@@ -549,8 +563,8 @@ export default function OcrHistoryPage({ onNavigate, onOpenRagChatbot }: Props) 
                   NEXT <ChevronRight size={13} />
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </main>

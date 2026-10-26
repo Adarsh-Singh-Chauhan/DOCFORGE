@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
-  Activity, FileText, CheckCircle2, AlertTriangle, MessageSquare, Clock,
-  Cpu, Zap, DollarSign, Calendar, ArrowUpRight, ArrowRight, RefreshCw,
-  Search, ShieldCheck, ChevronRight, BarChart3, PieChart, Layers, Download
+  FileText, CheckCircle2, AlertTriangle, MessageSquare, Clock,
+  Cpu, ArrowUpRight, ArrowRight, RefreshCw, ChevronRight, Layers
 } from 'lucide-react'
-import type { DashboardStats, OcrHistoryRecord, ChatConversation } from '../types'
+import type { DashboardStats } from '../types'
 import { fetchDashboardStats } from '../services/historyApi'
 
 interface Props {

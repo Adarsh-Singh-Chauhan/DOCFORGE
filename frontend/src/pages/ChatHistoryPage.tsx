@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   MessageSquare, Search, Trash2, Edit3, Download, ArrowRight,
-  Clock, Layers, Check, X, ChevronLeft, ChevronRight, RefreshCw, FileText
+  Check, X, ChevronLeft, ChevronRight, RefreshCw, ArrowUpDown
 } from 'lucide-react'
 import type { ChatConversation } from '../types'
 import { fetchChatHistory, renameConversation, deleteConversation, fetchChatConversation } from '../services/historyApi'
@@ -183,6 +183,15 @@ export default function ChatHistoryPage({ onNavigate }: Props) {
               </select>
 
               <button
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                className="btn-aarambh-outline"
+                style={{ padding: '6px 10px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                title="Toggle ascending / descending"
+              >
+                <ArrowUpDown size={12} /> {sortOrder.toUpperCase()}
+              </button>
+
+              <button
                 onClick={loadChats}
                 className="btn-aarambh-outline"
                 style={{ padding: '7px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -347,12 +356,26 @@ export default function ChatHistoryPage({ onNavigate }: Props) {
           </div>
 
           {/* Pagination Footer */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--border)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
                 PAGE {page} OF {totalPages} ({total} CONVERSATIONS)
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="mono-tag" style={{ fontSize: '10px' }}>PER PAGE:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '3px 6px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+                >
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
               </div>
+            </div>
 
+            {totalPages > 1 && (
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   disabled={page <= 1}
@@ -371,8 +394,8 @@ export default function ChatHistoryPage({ onNavigate }: Props) {
                   NEXT <ChevronRight size={12} />
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </main>

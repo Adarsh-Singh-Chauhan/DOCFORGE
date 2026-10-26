@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Moon, Sun, X, Menu, Settings, BarChart2, FileText, MessageSquare, LayoutDashboard, Cpu, Layers } from 'lucide-react'
+import { Moon, Sun, X, Menu, Settings, BarChart2, FileText, MessageSquare, LayoutDashboard, Layers } from 'lucide-react'
 
 interface Props {
   health: { status: string; modelsLoaded: boolean; device: string } | null

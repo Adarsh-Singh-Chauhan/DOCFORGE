@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  ArrowLeft, Download, Copy, Check, MessageSquare, RotateCw, FileText,
-  CheckCircle2, AlertTriangle, Clock, Layers, ShieldCheck, Binary,
-  FileCheck, Cpu, Database
+  ArrowLeft, Download, Copy, Check, MessageSquare, RotateCw, AlertTriangle
 } from 'lucide-react'
 import type { OcrHistoryRecord } from '../types'
 import { fetchOcrJobDetail, retryOcrJob } from '../services/historyApi'
