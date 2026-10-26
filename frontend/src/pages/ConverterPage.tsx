@@ -54,6 +54,16 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
   const [dragActive, setDragActive] = useState(false)
   const [indexedDocs, setIndexedDocs] = useState<Record<string, boolean>>({})
 
+  // CSV Validation & Preview Modal State
+  const [csvPreviewModal, setCsvPreviewModal] = useState<{
+    file: File
+    headers: string[]
+    rowCount: number
+    sampleRows: string[][]
+    encoding: string
+    hasDuplicates: boolean
+  } | null>(null)
+
   // Media Simulation State
   const [mediaTab, setMediaTab] = useState<'video' | 'scanner' | 'rag'>('video')
   const [isPlaying, setIsPlaying] = useState<boolean>(true)
@@ -221,16 +231,13 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
     return () => cancelAnimationFrame(animationFrameId)
   }, [mediaTab, isPlaying, mediaSpeed])
 
-  // ── File Handling ──────────────────────────────────────────────
-  const handleFiles = useCallback((files: FileList | File[]) => {
-    const fileList = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'))
-    if (fileList.length === 0) return
-
+  // ── File Handling (PDF & CSV Support) ──────────────────────────
+  const addFilesDirectly = (filesToAdd: File[]) => {
     setBatchFiles(prev => {
       const existingNames = new Set(prev.map(p => `${p.file.name}_${p.file.size}`))
       const newItems: BatchFileItem[] = []
 
-      for (const f of fileList) {
+      for (const f of filesToAdd) {
         const key = `${f.name}_${f.size}`
         if (!existingNames.has(key)) {
           existingNames.add(key)
@@ -243,6 +250,49 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
       }
       return [...prev, ...newItems]
     })
+  }
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const fileList = Array.from(files).filter(f => {
+      const name = f.name.toLowerCase()
+      return name.endsWith('.pdf') || name.endsWith('.csv') || name.endsWith('.tsv')
+    })
+    if (fileList.length === 0) return
+
+    // Identify any CSV files for validation & preview modal
+    const csvFile = fileList.find(f => {
+      const name = f.name.toLowerCase()
+      return name.endsWith('.csv') || name.endsWith('.tsv')
+    })
+
+    if (csvFile) {
+      const fd = new FormData()
+      fd.append('file', csvFile)
+      fetch('/api/csv/validate', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+          if (data.valid) {
+            setCsvPreviewModal({
+              file: csvFile,
+              headers: data.headers || [],
+              rowCount: data.rowCount || 0,
+              sampleRows: data.sampleRows || [],
+              encoding: data.encoding || 'utf-8',
+              hasDuplicates: !!data.hasDuplicates,
+            })
+          } else {
+            addFilesDirectly([csvFile])
+          }
+        })
+        .catch(() => {
+          addFilesDirectly([csvFile])
+        })
+    }
+
+    const pdfFiles = fileList.filter(f => f.name.toLowerCase().endsWith('.pdf'))
+    if (pdfFiles.length > 0) {
+      addFilesDirectly(pdfFiles)
+    }
   }, [])
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -499,6 +549,42 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
     const a = document.createElement('a')
     a.href = url
     a.download = `${baseName}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const confirmCsvImport = () => {
+    if (csvPreviewModal) {
+      addFilesDirectly([csvPreviewModal.file])
+      setCsvPreviewModal(null)
+    }
+  }
+
+  const downloadSampleCsv = () => {
+    window.open('/api/templates/csv', '_blank')
+  }
+
+  const exportBatchCsv = () => {
+    const completed = batchFiles.filter(f => f.status === 'completed' && f.result)
+    if (completed.length === 0) {
+      alert('No completed conversions available to export.')
+      return
+    }
+    const headers = ['File Name', 'Engine', 'Pages', 'Tokens Saved', 'Duration (ms)', 'Reduction %']
+    const rows = completed.map(item => [
+      `"${item.file.name.replace(/"/g, '""')}"`,
+      item.result?.engineName || 'Docling',
+      item.result?.pageCount || 1,
+      item.result?.tokensSaved || 0,
+      item.result?.durationMs || 0,
+      `${item.result?.reductionPercent || 0}%`,
+    ])
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `docforge_batch_report_${Date.now()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -1478,24 +1564,44 @@ $$`}
                 Batch Multi-File Converter
               </h2>
             </div>
-            {batchFiles.length > 0 && (
-              <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                className="btn-aarambh-outline"
+                onClick={downloadSampleCsv}
+                style={{ padding: '10px 16px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                title="Download standardized sample CSV template"
+              >
+                <Download size={13} /> SAMPLE CSV
+              </button>
+              {completedCount > 0 && (
                 <button
                   className="btn-aarambh-outline"
-                  onClick={() => inputRef.current?.click()}
-                  style={{ padding: '10px 18px', fontSize: '11px' }}
+                  onClick={exportBatchCsv}
+                  style={{ padding: '10px 16px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  title="Export completed batch report to CSV"
                 >
-                  <Plus size={13} /> ADD FILES
+                  <Download size={13} /> EXPORT CSV REPORT
                 </button>
-                <button
-                  className="btn-aarambh-outline"
-                  onClick={clearQueue}
-                  style={{ padding: '10px 18px', fontSize: '11px' }}
-                >
-                  <Trash2 size={13} /> CLEAR ALL
-                </button>
-              </div>
-            )}
+              )}
+              {batchFiles.length > 0 && (
+                <>
+                  <button
+                    className="btn-aarambh-outline"
+                    onClick={() => inputRef.current?.click()}
+                    style={{ padding: '10px 18px', fontSize: '11px' }}
+                  >
+                    <Plus size={13} /> ADD FILES
+                  </button>
+                  <button
+                    className="btn-aarambh-outline"
+                    onClick={clearQueue}
+                    style={{ padding: '10px 18px', fontSize: '11px' }}
+                  >
+                    <Trash2 size={13} /> CLEAR ALL
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="browser-frame">
@@ -1531,7 +1637,7 @@ $$`}
                   ref={inputRef}
                   type="file"
                   multiple
-                  accept=".pdf"
+                  accept=".pdf,.csv,.tsv,text/csv,application/vnd.ms-excel"
                   style={{ display: 'none' }}
                   onChange={e => {
                     if (e.target.files) handleFiles(e.target.files)
@@ -1542,10 +1648,10 @@ $$`}
                   <Upload size={26} />
                 </div>
                 <div className="aarambh-dropzone__title">
-                  SELECT OR DRAG & DROP MULTIPLE PDF FILES
+                  SELECT OR DRAG & DROP MULTIPLE PDF & CSV FILES
                 </div>
                 <div className="aarambh-dropzone__subtitle">
-                  HOLD SHIFT/CTRL TO CHOOSE MULTIPLE DOCUMENTS · PROCESSED LOCALLY
+                  HOLD SHIFT/CTRL TO CHOOSE MULTIPLE DOCUMENTS & TABULAR DATA · PROCESSED LOCALLY
                 </div>
               </div>
 
@@ -2151,6 +2257,100 @@ $$`}
         isOpen={isEngineModalOpen}
         onClose={() => setIsEngineModalOpen(false)}
       />
+
+      {/* CSV Import Preview & Validation Modal */}
+      {csvPreviewModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setCsvPreviewModal(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              width: '100%',
+              maxWidth: '680px',
+              padding: '1.5rem',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Table size={18} color="var(--accent)" />
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>
+                  CSV Import Preview & Validation
+                </h3>
+              </div>
+              <button
+                onClick={() => setCsvPreviewModal(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div><strong>FILE:</strong> {csvPreviewModal.file.name}</div>
+              <div><strong>ROWS:</strong> {csvPreviewModal.rowCount}</div>
+              <div><strong>COLUMNS:</strong> {csvPreviewModal.headers.length}</div>
+              <div><strong>ENCODING:</strong> {csvPreviewModal.encoding}</div>
+              {csvPreviewModal.hasDuplicates && (
+                <div style={{ color: '#ef4444' }}><strong>DUPLICATES:</strong> Detected</div>
+              )}
+            </div>
+
+            <div style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '4px', marginBottom: '1.25rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
+                    {csvPreviewModal.headers.map((h, i) => (
+                      <th key={i} style={{ padding: '8px 10px', color: 'var(--text-primary)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvPreviewModal.sampleRows.map((row, ri) => (
+                    <tr key={ri} style={{ borderBottom: '1px solid var(--border)' }}>
+                      {row.map((cell, ci) => (
+                        <td key={ci} style={{ padding: '6px 10px', color: 'var(--text-muted)' }}>{cell}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setCsvPreviewModal(null)}
+                className="btn-aarambh-outline"
+                style={{ padding: '8px 16px', fontSize: '11px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCsvImport}
+                className="btn-aarambh-primary"
+                style={{ padding: '8px 20px', fontSize: '11px', fontWeight: 800 }}
+              >
+                Confirm & Add to Batch Queue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

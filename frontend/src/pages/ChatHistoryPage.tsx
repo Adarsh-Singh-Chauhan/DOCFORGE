@@ -682,7 +682,7 @@ export default function ChatHistoryPage({ onNavigate }: Props) {
 
                       {/* Formula Display Box matching reference */}
                       <div style={{ background: 'var(--bg-primary)', padding: '14px 18px', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center', margin: '14px 0', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--text-primary)' }}>
-                        $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+                        {'$$\\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V$$'}
                       </div>
 
                       <p style={{ margin: '0 0 14px' }}>
