@@ -38,6 +38,7 @@ export async function fetchOcrHistory(params: {
   search?: string
   engine?: string
   status?: string
+  file_type?: string
   start_time?: number
   end_time?: number
   sort_by?: string
@@ -55,6 +56,7 @@ export async function fetchOcrHistory(params: {
   if (params.search) q.set('search', params.search)
   if (params.engine && params.engine !== 'all') q.set('engine', params.engine)
   if (params.status && params.status !== 'all') q.set('status', params.status)
+  if (params.file_type && params.file_type !== 'all') q.set('file_type', params.file_type)
   if (params.start_time) q.set('start_time', String(params.start_time))
   if (params.end_time) q.set('end_time', String(params.end_time))
   if (params.sort_by) q.set('sort_by', params.sort_by)
