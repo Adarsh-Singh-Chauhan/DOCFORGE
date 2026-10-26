@@ -466,6 +466,7 @@ def get_ocr_jobs(
     search: Optional[str] = None,
     engine: Optional[str] = None,
     status: Optional[str] = None,
+    file_type: Optional[str] = None,
     start_time: Optional[float] = None,
     end_time: Optional[float] = None,
     sort_by: str = "created_at",
@@ -500,6 +501,10 @@ def get_ocr_jobs(
     if status and status.lower() != "all":
         query += "AND status = ? "
         params.append(status.lower())
+
+    if file_type and file_type.lower() != "all":
+        query += "AND file_type = ? "
+        params.append(file_type.lower())
 
     if start_time is not None:
         query += "AND created_at >= ? "
