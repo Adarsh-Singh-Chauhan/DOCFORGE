@@ -739,9 +739,12 @@ def get_dashboard_metrics(
                 COUNT(*) as total_jobs,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successful_jobs,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_jobs,
+                SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing_jobs,
                 SUM(COALESCE(page_count, 1)) as total_pages,
                 SUM(COALESCE(tokens_saved, 0)) as total_tokens_saved,
                 AVG(CASE WHEN status = 'completed' THEN duration_ms ELSE NULL END) as avg_duration_ms,
+                MIN(CASE WHEN status = 'completed' THEN duration_ms ELSE NULL END) as min_duration_ms,
+                MAX(CASE WHEN status = 'completed' THEN duration_ms ELSE NULL END) as max_duration_ms,
                 SUM(COALESCE(cost_estimated, 0.0)) as total_cost
             FROM ocr_jobs
             WHERE created_at >= ? AND (? IS NULL OR created_at <= ?)
@@ -800,11 +803,12 @@ def get_dashboard_metrics(
                 "total_cost": round(p["total_cost"] or 0.0, 4),
             })
 
-        # Daily Activity Timeline for Chart (last 7 intervals or days)
+        # Daily OCR Activity Timeline for Chart
         timeline_cursor = conn.execute("""
             SELECT
                 strftime('%Y-%m-%d', datetime(created_at, 'unixepoch')) as day,
                 COUNT(*) as job_count,
+                SUM(COALESCE(page_count, 1)) as pages_count,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as success_count,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as fail_count,
                 AVG(CASE WHEN status = 'completed' THEN duration_ms ELSE NULL END) as avg_duration
@@ -814,30 +818,52 @@ def get_dashboard_metrics(
             ORDER BY day ASC
         """, (cutoff, end_time, end_time)).fetchall()
 
-        timeline = [
-            {
-                "date": r["day"],
+        # Chat timeline map
+        chat_days = {
+            r["day"]: {
+                "conversations": r["conv_count"],
+                "messages": r["msg_count"]
+            }
+            for r in conn.execute("""
+                SELECT
+                    strftime('%Y-%m-%d', datetime(c.created_at, 'unixepoch')) as day,
+                    COUNT(DISTINCT c.id) as conv_count,
+                    COUNT(m.id) as msg_count
+                FROM chat_conversations c
+                LEFT JOIN chat_messages m ON c.id = m.conversation_id
+                WHERE c.created_at >= ? AND (? IS NULL OR c.created_at <= ?)
+                GROUP BY day
+            """, (cutoff, end_time, end_time)).fetchall()
+        }
+
+        timeline = []
+        for r in timeline_cursor:
+            d_str = r["day"]
+            c_info = chat_days.get(d_str, {"conversations": 0, "messages": 0})
+            timeline.append({
+                "date": d_str,
                 "jobs": r["job_count"],
+                "pages": r["pages_count"] or 0,
                 "success": r["success_count"],
                 "failed": r["fail_count"],
                 "avg_duration_ms": round(r["avg_duration"] or 0, 0),
-            }
-            for r in timeline_cursor
-        ]
+                "conversations": c_info["conversations"],
+                "messages": c_info["messages"],
+            })
 
-        # Recent 5 activity records
+        # Recent 6 activity records
         recent_jobs = conn.execute("""
-            SELECT id, file_name, engine, engine_name, engine_type, status, duration_ms, page_count, created_at
+            SELECT id, file_name, file_type, engine, engine_name, engine_type, status, duration_ms, page_count, created_at
             FROM ocr_jobs
             ORDER BY created_at DESC
-            LIMIT 5
+            LIMIT 10
         """).fetchall()
 
         recent_chats = conn.execute("""
             SELECT id, title, model, message_count, updated_at
             FROM chat_conversations
             ORDER BY updated_at DESC
-            LIMIT 5
+            LIMIT 10
         """).fetchall()
 
     total_jobs = ocr_summary["total_jobs"] or 0
@@ -851,10 +877,13 @@ def get_dashboard_metrics(
             "jobs_today": jobs_today,
             "successful_jobs": succ_jobs,
             "failed_jobs": fail_jobs,
+            "processing_jobs": ocr_summary["processing_jobs"] or 0,
             "overall_success_rate": round(overall_success_rate, 1),
             "total_pages": ocr_summary["total_pages"] or 0,
             "total_tokens_saved": ocr_summary["total_tokens_saved"] or 0,
             "avg_ocr_duration_ms": round(ocr_summary["avg_duration_ms"] or 0, 0),
+            "min_ocr_duration_ms": round(ocr_summary["min_duration_ms"] or 0, 0),
+            "max_ocr_duration_ms": round(ocr_summary["max_duration_ms"] or 0, 0),
             "total_conversations": chat_summary["total_conversations"] or 0,
             "total_chat_messages": chat_summary["total_messages"] or 0,
             "chats_today": chats_today,
