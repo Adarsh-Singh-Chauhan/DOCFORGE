@@ -244,108 +244,156 @@ async def convert_pdf(
             target.write(file_bytes)
         logger.info("[%s] upload saved elapsed=%.3fs", request_id, time.perf_counter() - stage_started)
 
-        lock_wait_started = time.perf_counter()
-        await _marker_lock.acquire()
-        marker_lock_acquired = True
-        logger.info("[%s] conversion lock acquired wait=%.3fs", request_id, time.perf_counter() - lock_wait_started)
+        if file_ext in ["csv", "tsv"]:
+            # Native high-performance CSV validation and Markdown transformation
+            decoded = None
+            for enc in ["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
+                try:
+                    decoded = file_bytes.decode(enc)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if decoded is None:
+                decoded = file_bytes.decode("utf-8", errors="replace")
 
-        # Inspect selectable text and image coverage without invoking OCR.
-        stage_started = time.perf_counter()
-        inspection = await run_in_threadpool(inspect_pdf_text, upload_path)
-        baseline_available = bool(inspection.extracted_text)
-        baseline_chars = inspection.extracted_characters if baseline_available else None
-        baseline_words = len(inspection.extracted_text.split()) if baseline_available else None
-        logger.info(
-            "[%s] PDF text inspection finished pages=%d text_pages=%d image_pages=%d chars=%d status=%s elapsed=%.3fs",
-            request_id,
-            inspection.page_count, inspection.text_page_count, inspection.image_page_count,
-            inspection.extracted_characters, inspection.baseline_status,
-            time.perf_counter() - stage_started,
-        )
+            delimiter = "\t" if file_ext == "tsv" or ("\t" in decoded[:300] and "," not in decoded[:300]) else ","
+            reader = list(csv.reader(io.StringIO(decoded), delimiter=delimiter))
+            valid_rows = [r for r in reader if any(cell.strip() for cell in r)]
+            if not valid_rows:
+                raise ValueError("The uploaded CSV file contains no valid rows or readable tabular records.")
 
-        options = {
-            "output_format": "markdown",
-            "force_ocr": force_ocr or False,
-            "paginate_output": False,
-        }
-        if mode:
-            options["mode"] = mode
-        config_parser = ConfigParser(options)
-        config_dict = config_parser.generate_config_dict()
-        # marker_single uses the provider's default of 4 pdftext workers. Match it
-        # here; forcing one worker was a material API/CLI configuration mismatch.
-        config_dict["pdftext_workers"] = 4
-        safe_config = {
-            key: ("[redacted]" if any(secret in key.lower() for secret in ("key", "token", "secret")) else value)
-            for key, value in config_dict.items()
-        }
-        logger.info(
-            "[%s] conversion started marker_config=%s effective_pdftext_workers=4",
-            request_id,
-            safe_config,
-        )
+            headers = [h.strip() or f"Column_{i+1}" for i, h in enumerate(valid_rows[0])]
+            data_rows = valid_rows[1:]
 
-        # Determine effective engine
-        req_engine = (engine or "auto").lower()
-        if req_engine == "auto":
-            chosen_engine = select_auto_engine(file_bytes, filename, cloud_consent or False)
+            header_line = "| " + " | ".join(h.replace("|", "\\|") for h in headers) + " |"
+            sep_line = "| " + " | ".join("---" for _ in headers) + " |"
+            data_lines = [
+                "| " + " | ".join((cell.strip().replace("|", "\\|") if i < len(r) else "") for i, cell in enumerate(r)) + " |"
+                for r in data_rows
+            ]
+
+            text = f"# {filename}\n\n*Structured CSV Table Extraction ({len(data_rows)} rows, {len(headers)} columns)*\n\n" + "\n".join([header_line, sep_line] + data_lines)
+            page_count = max(1, math.ceil(len(valid_rows) / 35))
+            chosen_engine = "docling"
+            engine_name = "Docling (CSV Processor)"
+            engine_type = "local"
+            tables_detected = 1
+            equations_detected = 0
+            figures_detected = 0
+            actual_mode = "tabular"
+            baseline_available = True
+            baseline_chars = len(decoded)
+            baseline_words = len(decoded.split())
+            inspection = type("Inspection", (), {
+                "page_count": page_count,
+                "text_page_count": page_count,
+                "image_page_count": 0,
+                "extracted_characters": len(text),
+                "baseline_status": "complete",
+                "baseline_reason": "Native tabular CSV converted to Markdown table",
+                "coverage_percent": 100.0,
+            })()
         else:
-            chosen_engine = req_engine
+            lock_wait_started = time.perf_counter()
+            await _marker_lock.acquire()
+            marker_lock_acquired = True
+            logger.info("[%s] conversion lock acquired wait=%.3fs", request_id, time.perf_counter() - lock_wait_started)
 
-        engine_display_names = {
-            "docling": ("Docling (Local Processing)", "local"),
-            "surya": ("Surya VLM (Local OCR)", "local"),
-            "mistral": ("Mistral OCR API", "cloud"),
-            "mathpix": ("Mathpix OCR API", "cloud"),
-            "llamaparse": ("LlamaParse API", "cloud"),
-        }
-        engine_name, engine_type = engine_display_names.get(chosen_engine, ("Docling (Local)", "local"))
-        tables_detected = 0
-        equations_detected = 0
-        figures_detected = 0
+            # Inspect selectable text and image coverage without invoking OCR.
+            stage_started = time.perf_counter()
+            inspection = await run_in_threadpool(inspect_pdf_text, upload_path)
+            baseline_available = bool(inspection.extracted_text)
+            baseline_chars = inspection.extracted_characters if baseline_available else None
+            baseline_words = len(inspection.extracted_text.split()) if baseline_available else None
+            logger.info(
+                "[%s] PDF text inspection finished pages=%d text_pages=%d image_pages=%d chars=%d status=%s elapsed=%.3fs",
+                request_id,
+                inspection.page_count, inspection.text_page_count, inspection.image_page_count,
+                inspection.extracted_characters, inspection.baseline_status,
+                time.perf_counter() - stage_started,
+            )
 
-        stage_started = time.perf_counter()
-        if chosen_engine == "mistral":
-            if not cloud_consent:
-                raise ValueError("Cloud processing consent required before sending documents to Mistral AI.")
-            eng_res = await run_in_threadpool(run_mistral_ocr, file_bytes, filename)
-            text = eng_res.markdown
-            page_count = eng_res.page_count
-            tables_detected = eng_res.tables_detected
-            equations_detected = eng_res.equations_detected
-            figures_detected = eng_res.figures_detected
-        elif chosen_engine == "mathpix":
-            if not cloud_consent:
-                raise ValueError("Cloud processing consent required before sending documents to Mathpix API.")
-            eng_res = await run_in_threadpool(run_mathpix_ocr, file_bytes, filename)
-            text = eng_res.markdown
-            page_count = eng_res.page_count
-            tables_detected = eng_res.tables_detected
-            equations_detected = eng_res.equations_detected
-            figures_detected = eng_res.figures_detected
-        elif chosen_engine == "llamaparse":
-            if not cloud_consent:
-                raise ValueError("Cloud processing consent required before sending documents to LlamaParse API.")
-            eng_res = await run_in_threadpool(run_llamaparse, file_bytes, filename)
-            text = eng_res.markdown
-            page_count = eng_res.page_count
-            tables_detected = eng_res.tables_detected
-            equations_detected = eng_res.equations_detected
-            figures_detected = eng_res.figures_detected
-        elif chosen_engine == "docling":
-            eng_res = await run_in_threadpool(run_docling_conversion, upload_path, file_bytes, filename)
-            text = eng_res.markdown
-            page_count = eng_res.page_count
-            tables_detected = eng_res.tables_detected
-            equations_detected = eng_res.equations_detected
-            figures_detected = eng_res.figures_detected
-        else: # surya
-            text, page_count = await run_in_threadpool(run_marker_conversion, upload_path, config_dict)
-            tables_detected = len(re.findall(r"\|.*?\|.*?\|", text))
-            equations_detected = len(re.findall(r"\$\$.*?\$\$|\$.*?\$", text, re.DOTALL))
-            figures_detected = len(re.findall(r"!\[.*?\]\(.*?\)", text))
+            options = {
+                "output_format": "markdown",
+                "force_ocr": force_ocr or False,
+                "paginate_output": False,
+            }
+            if mode:
+                options["mode"] = mode
+            config_parser = ConfigParser(options)
+            config_dict = config_parser.generate_config_dict()
+            config_dict["pdftext_workers"] = 4
+            safe_config = {
+                key: ("[redacted]" if any(secret in key.lower() for secret in ("key", "token", "secret")) else value)
+                for key, value in config_dict.items()
+            }
+            logger.info(
+                "[%s] conversion started marker_config=%s effective_pdftext_workers=4",
+                request_id,
+                safe_config,
+            )
 
-        actual_mode = config_dict.get("mode", "unknown")
+            # Determine effective engine
+            req_engine = (engine or "auto").lower()
+            if req_engine == "auto":
+                chosen_engine = select_auto_engine(file_bytes, filename, cloud_consent or False)
+            else:
+                chosen_engine = req_engine
+
+            engine_display_names = {
+                "docling": ("Docling (Local Processing)", "local"),
+                "surya": ("Surya VLM (Local OCR)", "local"),
+                "mistral": ("Mistral OCR API", "cloud"),
+                "mathpix": ("Mathpix OCR API", "cloud"),
+                "llamaparse": ("LlamaParse API", "cloud"),
+            }
+            engine_name, engine_type = engine_display_names.get(chosen_engine, ("Docling (Local)", "local"))
+            tables_detected = 0
+            equations_detected = 0
+            figures_detected = 0
+
+            stage_started = time.perf_counter()
+            if chosen_engine == "mistral":
+                if not cloud_consent:
+                    raise ValueError("Cloud processing consent required before sending documents to Mistral AI.")
+                eng_res = await run_in_threadpool(run_mistral_ocr, file_bytes, filename)
+                text = eng_res.markdown
+                page_count = eng_res.page_count
+                tables_detected = eng_res.tables_detected
+                equations_detected = eng_res.equations_detected
+                figures_detected = eng_res.figures_detected
+            elif chosen_engine == "mathpix":
+                if not cloud_consent:
+                    raise ValueError("Cloud processing consent required before sending documents to Mathpix API.")
+                eng_res = await run_in_threadpool(run_mathpix_ocr, file_bytes, filename)
+                text = eng_res.markdown
+                page_count = eng_res.page_count
+                tables_detected = eng_res.tables_detected
+                equations_detected = eng_res.equations_detected
+                figures_detected = eng_res.figures_detected
+            elif chosen_engine == "llamaparse":
+                if not cloud_consent:
+                    raise ValueError("Cloud processing consent required before sending documents to LlamaParse API.")
+                eng_res = await run_in_threadpool(run_llamaparse, file_bytes, filename)
+                text = eng_res.markdown
+                page_count = eng_res.page_count
+                tables_detected = eng_res.tables_detected
+                equations_detected = eng_res.equations_detected
+                figures_detected = eng_res.figures_detected
+            elif chosen_engine == "docling":
+                eng_res = await run_in_threadpool(run_docling_conversion, upload_path, file_bytes, filename)
+                text = eng_res.markdown
+                page_count = eng_res.page_count
+                tables_detected = eng_res.tables_detected
+                equations_detected = eng_res.equations_detected
+                figures_detected = eng_res.figures_detected
+            else: # surya
+                text, page_count = await run_in_threadpool(run_marker_conversion, upload_path, config_dict)
+                tables_detected = len(re.findall(r"\|.*?\|.*?\|", text))
+                equations_detected = len(re.findall(r"\$\$.*?\$\$|\$.*?\$", text, re.DOTALL))
+                figures_detected = len(re.findall(r"!\[.*?\]\(.*?\)", text))
+
+            actual_mode = config_dict.get("mode", "unknown")
         logger.info(
             "[%s] conversion finished engine=%s pages=%s markdown_chars=%d elapsed=%.3fs",
             request_id,
