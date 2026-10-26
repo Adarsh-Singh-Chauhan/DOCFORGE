@@ -1,0 +1,19 @@
+{
+  "name": "docforge",
+  "version": "2.0.0",
+  "description": "DOCFORGE: High-Performance Document Engine & Local RAG AI Studio",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build"
+  },
+  "keywords": [
+    "docforge",
+    "pdf-to-markdown",
+    "rag-chatbot",
+    "surya-vlm",
+    "document-intelligence",
+    "local-ai"
+  ],
+  "author": "Adarsh Singh Chauhan",
+  "license": "Apache-2.0"
+}
