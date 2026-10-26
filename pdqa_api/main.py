@@ -585,6 +585,7 @@ async def get_ocr_history_endpoint(
     search: Optional[str] = None,
     engine: Optional[str] = None,
     status: Optional[str] = None,
+    file_type: Optional[str] = None,
     start_time: Optional[float] = None,
     end_time: Optional[float] = None,
     sort_by: str = "created_at",
@@ -597,6 +598,7 @@ async def get_ocr_history_endpoint(
         search=search,
         engine=engine,
         status=status,
+        file_type=file_type,
         start_time=start_time,
         end_time=end_time,
         sort_by=sort_by,
@@ -632,15 +634,94 @@ async def retry_ocr_history_job(job_id: str):
     job = get_ocr_job_by_id(job_id)
     if not job:
         return JSONResponse(status_code=404, content={"success": False, "error": "Job not found"})
-    # Reset job to processing or return metadata for client to re-dispatch
     return {"success": True, "job": job, "message": "Ready for re-processing"}
 
 
 @app.get("/api/ocr/export")
-async def export_ocr_history(format: str = "json"):
-    """Export OCR conversion history in JSON format."""
-    data = get_ocr_jobs(page=1, page_size=1000, include_markdown=False)
+async def export_ocr_history(format: str = "csv"):
+    """Export OCR conversion history in CSV or JSON format."""
+    data = get_ocr_jobs(page=1, page_size=2000, include_markdown=False)
+    if format.lower() == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["ID", "File Name", "File Type", "Engine", "Status", "Pages", "Duration (ms)", "Tokens Saved", "Cost ($)", "Submitted At"])
+        for j in data["items"]:
+            writer.writerow([
+                j["id"],
+                j["file_name"],
+                j.get("file_type", "pdf"),
+                j.get("engine_name", j["engine"]),
+                j["status"].upper(),
+                j.get("page_count", 1),
+                j.get("duration_ms", 0),
+                j.get("tokens_saved", 0),
+                f"${j.get('cost_estimated', 0.0):.3f}",
+                time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(j["created_at"]))
+            ])
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=docforge_ocr_history_{int(time.time())}.csv"}
+        )
     return {"success": True, "records": data["items"], "total": data["total"]}
+
+
+@app.post("/api/csv/validate")
+async def validate_csv_upload(file: UploadFile = File(...)):
+    """Validate CSV structure, check headers, encoding, sample rows, and potential duplicates."""
+    file_bytes = await file.read()
+    filename = file.filename or "import.csv"
+    decoded = None
+    detected_encoding = "utf-8"
+    for enc in ["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
+        try:
+            decoded = file_bytes.decode(enc)
+            detected_encoding = enc
+            break
+        except UnicodeDecodeError:
+            continue
+    if decoded is None:
+        decoded = file_bytes.decode("utf-8", errors="replace")
+        detected_encoding = "utf-8 (fallback)"
+
+    delimiter = "\t" if filename.endswith(".tsv") or ("\t" in decoded[:300] and "," not in decoded[:300]) else ","
+    rows = list(csv.reader(io.StringIO(decoded), delimiter=delimiter))
+    valid_rows = [r for r in rows if any(c.strip() for c in r)]
+    if not valid_rows:
+        return JSONResponse(status_code=400, content={"valid": False, "error": "CSV contains no data or valid headers."})
+
+    headers = [h.strip() or f"Column_{i+1}" for i, h in enumerate(valid_rows[0])]
+    sample_rows = valid_rows[1:6]
+    has_dupes = len(set(tuple(r) for r in valid_rows[1:])) < len(valid_rows[1:]) if len(valid_rows) > 1 else False
+
+    return {
+        "valid": True,
+        "filename": filename,
+        "encoding": detected_encoding,
+        "delimiter": delimiter,
+        "headers": headers,
+        "rowCount": len(valid_rows) - 1,
+        "columnCount": len(headers),
+        "sampleRows": sample_rows,
+        "hasDuplicates": has_dupes,
+    }
+
+
+@app.get("/api/templates/csv")
+async def download_csv_template():
+    """Download standardized sample CSV template for document importing."""
+    template_content = (
+        "Document_ID,Title,Category,Department,Confidentiality,Summary,Word_Count\n"
+        "DOC_001,Annual Financial Statement 2024,Financial,Accounting,Confidential,Audited balance sheet and income statements for fiscal year 2024.,4820\n"
+        "DOC_002,Architecture Whitepaper v2,Technical,Engineering,Internal,Distributed consensus and microservices pipeline specifications.,8940\n"
+        "DOC_003,Supplier Master Agreement,Legal,Procurement,Strictly Confidential,Terms and SLA requirements for tier-1 cloud providers.,3410\n"
+        "DOC_004,Employee Handbook 2025,Human Resources,HR,Public,Standard operating procedures and remote work guidelines.,6200\n"
+    )
+    return Response(
+        content=template_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=docforge_import_sample.csv"}
+    )
 
 
 @app.get("/api/chat/history")
