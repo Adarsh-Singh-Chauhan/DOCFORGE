@@ -52,11 +52,11 @@ export default function Header({ health, activeTab, onTabChange, onOpenSettings,
         <div className="aarambh-header__inner">
           {/* Logo Badge */}
           <a
-            href="#/dashboard"
+            href="#/converter"
             className="aarambh-logo"
             onClick={e => {
               e.preventDefault()
-              handleNavClick('dashboard')
+              handleNavClick('converter')
             }}
           >
             <div className="aarambh-logo__badge">

@@ -11,7 +11,7 @@ import EngineConfigModal from './components/EngineConfigModal'
 
 export default function App() {
   const [health, setHealth] = useState<{ status: string; modelsLoaded: boolean; device: string } | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('dashboard')
+  const [activeTab, setActiveTab] = useState<string>('converter')
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [isEngineModalOpen, setIsEngineModalOpen] = useState(false)
@@ -21,12 +21,15 @@ export default function App() {
   // ── URL Hash Synchronization for Browser Back/Forward & Direct Tabs ─────
   const parseHash = () => {
     const hash = window.location.hash.replace(/^#\/?/, '')
-    if (!hash || hash === 'dashboard') {
-      setActiveTab('dashboard')
+    if (!hash || hash === 'converter') {
+      setActiveTab('converter')
       setActiveJobId(null)
       setActiveChatId(null)
-    } else if (hash === 'converter') {
-      setActiveTab('converter')
+      if (!window.location.hash || window.location.hash === '#/' || window.location.hash === '#') {
+        window.location.replace('#/converter')
+      }
+    } else if (hash === 'dashboard') {
+      setActiveTab('dashboard')
       setActiveJobId(null)
       setActiveChatId(null)
     } else if (hash === 'ocr-history') {
