@@ -317,7 +317,7 @@ Create a `.env` file in the project root to configure optional cloud engines:
 
 Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for details.
 
-Developed with pride by **[Adarsh Singh Chauhan](https://github.com/Adarsh-Singh-Chauhan)**. Contributions, feature requests, and bug reports are warmly welcome!
+Developed with pride by **Ansh-Dubey-05**. Contributions, feature requests, and bug reports are warmly welcome!
 
 <p align="center">
   <a href="#docforge-studio">
