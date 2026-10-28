@@ -55,7 +55,6 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_ocr_jobs_created_at ON ocr_jobs(created_at);
         CREATE INDEX IF NOT EXISTS idx_ocr_jobs_engine ON ocr_jobs(engine);
         CREATE INDEX IF NOT EXISTS idx_ocr_jobs_status ON ocr_jobs(status);
-        CREATE INDEX IF NOT EXISTS idx_ocr_jobs_md5 ON ocr_jobs(file_md5);
 
         CREATE TABLE IF NOT EXISTS chat_conversations (
             id TEXT PRIMARY KEY,
@@ -111,6 +110,7 @@ def init_db():
                 conn.execute("ALTER TABLE ocr_jobs ADD COLUMN file_sha256 TEXT")
             if "markdown_md5" not in cols:
                 conn.execute("ALTER TABLE ocr_jobs ADD COLUMN markdown_md5 TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ocr_jobs_md5 ON ocr_jobs(file_md5)")
         except Exception:
             pass
 

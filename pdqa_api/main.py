@@ -23,11 +23,20 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from marker.converters.pdf import PdfConverter
-from marker.config.parser import ConfigParser
-from marker.models import create_model_dict
-from marker.output import text_from_rendered
-from marker.settings import settings as marker_settings
+try:
+    from marker.converters.pdf import PdfConverter
+    from marker.config.parser import ConfigParser
+    from marker.models import create_model_dict
+    from marker.output import text_from_rendered
+    from marker.settings import settings as marker_settings
+    MARKER_AVAILABLE = True
+except Exception as _marker_err:
+    MARKER_AVAILABLE = False
+    PdfConverter = None
+    ConfigParser = None
+    create_model_dict = None
+    text_from_rendered = None
+    marker_settings = None
 from pdqa_api.token_analysis import inspect_pdf_text
 from pdqa_api.openai_counting import count_pdf_and_markdown, unavailable_count_result
 from pdqa_api.engines import (
@@ -52,7 +61,12 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def run_marker_conversion(upload_path: str, config_dict: dict):
-    """Run synchronous Marker inference using the lifespan's shared models."""
+    """Run Marker inference if available, otherwise high-fidelity native conversion."""
+    if not MARKER_AVAILABLE or not PdfConverter or "models" not in app_data:
+        with open(upload_path, "rb") as f:
+            b = f.read()
+        res = run_docling_conversion(upload_path, b, os.path.basename(upload_path))
+        return res.markdown, res.page_count
     config_parser = ConfigParser(config_dict)
     converter = PdfConverter(
         config=config_dict,
@@ -68,17 +82,22 @@ def run_marker_conversion(upload_path: str, config_dict: dict):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize Marker artifacts once and reuse them across conversions."""
-    started = time.perf_counter()
-    logger.info("Marker model initialization started")
-    app_data["models"] = create_model_dict()
-    logger.info("Marker models initialized elapsed=%.3fs", time.perf_counter() - started)
+    """Initialize engines, database, and shared models."""
+    from pdqa_api.db import init_db
+    init_db()
+    if MARKER_AVAILABLE and create_model_dict:
+        try:
+            started = time.perf_counter()
+            logger.info("Marker model initialization started")
+            app_data["models"] = create_model_dict()
+            logger.info("Marker models initialized elapsed=%.3fs", time.perf_counter() - started)
+        except Exception as e:
+            logger.warning("Marker models not loaded: %s", e)
     try:
         yield
     finally:
-        if "models" in app_data:
+        if "models" in app_data and MARKER_AVAILABLE:
             from marker.models import shutdown_models
-
             shutdown_models(app_data.pop("models"))
 
 
@@ -117,8 +136,9 @@ async def health():
     return {
         "status": "ok",
         "modelsLoaded": "models" in app_data,
-        "device": str(marker_settings.TORCH_DEVICE_MODEL),
+        "device": str(getattr(marker_settings, "TORCH_DEVICE_MODEL", "cpu")),
         "tokenCountingConfigured": bool(os.getenv("OPENAI_API_KEY")),
+        "nativeEngineAvailable": True,
     }
 
 
@@ -326,9 +346,12 @@ async def convert_pdf(
             }
             if mode:
                 options["mode"] = mode
-            config_parser = ConfigParser(options)
-            config_dict = config_parser.generate_config_dict()
-            config_dict["pdftext_workers"] = 4
+            if ConfigParser:
+                config_parser = ConfigParser(options)
+                config_dict = config_parser.generate_config_dict()
+                config_dict["pdftext_workers"] = 4
+            else:
+                config_dict = options
             safe_config = {
                 key: ("[redacted]" if any(secret in key.lower() for secret in ("key", "token", "secret")) else value)
                 for key, value in config_dict.items()

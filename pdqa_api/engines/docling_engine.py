@@ -101,6 +101,8 @@ def _extract_text_and_layout(file_path: str, file_bytes: bytes, filename: str):
 
     for p_num, raw_page in enumerate(page_texts, 1):
         clean_page = raw_page.replace("\r\n", "\n").replace("\r", "\n")
+        # Remove non-printable control characters and invalid unicode artifacts
+        clean_page = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\ufffd]", "", clean_page)
         # Fix hyphenated words broken across line breaks (e.g. con- \n nection)
         clean_page = re.sub(r"(\w+)-\n(\w+)", r"\1\2", clean_page)
 

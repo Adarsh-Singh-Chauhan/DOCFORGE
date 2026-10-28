@@ -7,6 +7,7 @@ import {
 import type { RagDocument, ChatMessage } from '../types'
 import { queryGeminiAI, getGeminiApiKey, saveGeminiApiKey } from '../services/gemini'
 import { fetchChatConversation } from '../services/historyApi'
+import { synthesizeClientGroundedAnswer } from '../utils/documentUtils'
 
 interface Props {
   initialDocs?: Array<{ id: string; title: string; content: string }>
@@ -371,7 +372,6 @@ Ask any question about your documents. Every response is **strictly grounded in 
     }))
 
     // Synthesize intelligent structured answer
-    const { synthesizeClientGroundedAnswer } = await import('../utils/documentUtils')
     const answer = synthesizeClientGroundedAnswer(userQuery, retrievedChunks, citations)
 
     return { answer, citations, chunks: retrievedChunks }
