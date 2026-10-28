@@ -164,7 +164,9 @@ async function decompressFlateBytes(bytes: Uint8Array): Promise<string | null> {
   if (typeof DecompressionStream === 'undefined') return null
   for (const fmt of ['deflate', 'deflate-raw'] as const) {
     try {
-      const resp = new Response(bytes.buffer as ArrayBuffer)
+      const copyBuffer = new ArrayBuffer(bytes.byteLength)
+      new Uint8Array(copyBuffer).set(bytes)
+      const resp = new Response(copyBuffer)
       const decompStream = resp.body!.pipeThrough(new DecompressionStream(fmt))
       const buf = await new Response(decompStream).arrayBuffer()
       return new TextDecoder('latin1').decode(buf)
@@ -600,158 +602,366 @@ export function downloadWordDoc(filename: string, title: string, markdown: strin
   URL.revokeObjectURL(url)
 }
 
-/** 3. Download / Print as Styled PDF Document */
-export function downloadPdfDocument(filename: string, title: string, markdown: string): void {
-  const baseName = filename.replace(/\.[^.]+$/, '') || 'document'
-  const renderedContent = renderMarkdownToHtml(markdown)
+/** 3. Download Original Uploaded File (Bytes Unchanged) */
+export function downloadOriginalFile(file: File): void {
+  const url = URL.createObjectURL(file)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file.name
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 
-  const printWindow = window.open('', '_blank', 'width=900,height=750')
-  if (!printWindow) {
-    // Fallback: Download formatted HTML file if popup blocker is active
-    const blob = new Blob([renderedContent], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${baseName}-document.html`
-    a.click()
-    URL.revokeObjectURL(url)
-    return
+function escapePdfText(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2014/g, ' -- ')
+    .replace(/\u2013/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u2022\u25CF]/g, '*')
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, ' ')
+}
+
+/** 4. Genuine Vector PDF Builder (PDF-1.4 Compliant, Selectable & Searchable) */
+export function buildVectorPdfBytes(title: string, markdown: string): Uint8Array {
+  const marginX = 50
+  const maxContentWidth = 495
+  const topY = 780
+  const bottomMargin = 55
+
+  const pagesOps: string[][] = [[]]
+  let curPageIdx = 0
+  let curY = topY
+
+  const newPage = () => {
+    curPageIdx++
+    pagesOps.push([])
+    curY = topY
   }
 
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>${title || baseName} - DOCFORGE Export</title>
-      <style>
-        @page {
-          size: A4 portrait;
-          margin: 20mm 15mm;
+  const checkPageSpace = (neededHeight: number) => {
+    if (curY - neededHeight < bottomMargin) {
+      newPage()
+    }
+  }
+
+  const rawLines = markdown.split(/\r?\n/)
+  let inCodeBlock = false
+  let codeBuffer: string[] = []
+  let tableBuffer: string[][] = []
+
+  const flushTable = () => {
+    if (tableBuffer.length === 0) return
+    const numCols = Math.max(...tableBuffer.map(r => r.length))
+    if (numCols === 0) {
+      tableBuffer = []
+      return
+    }
+    const colWidth = maxContentWidth / numCols
+    const rowHeight = 18
+
+    for (let rIdx = 0; rIdx < tableBuffer.length; rIdx++) {
+      checkPageSpace(rowHeight + 4)
+      const isHeader = rIdx === 0
+      const row = tableBuffer[rIdx]
+
+      if (isHeader) {
+        pagesOps[curPageIdx].push(
+          `0.92 0.94 0.97 rg ${marginX} ${curY - rowHeight + 4} ${maxContentWidth} ${rowHeight} re f`
+        )
+      }
+
+      pagesOps[curPageIdx].push(
+        `0.80 0.83 0.88 RG 0.5 w ${marginX} ${curY - rowHeight + 4} ${maxContentWidth} ${rowHeight} re S`
+      )
+
+      for (let cIdx = 0; cIdx < numCols; cIdx++) {
+        const cellX = marginX + cIdx * colWidth
+        if (cIdx > 0) {
+          pagesOps[curPageIdx].push(
+            `0.80 0.83 0.88 RG 0.5 w ${cellX} ${curY - rowHeight + 4} m ${cellX} ${curY + 4} l S`
+          )
         }
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; }
-        }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-          font-size: 11pt;
-          line-height: 1.6;
-          color: #1e293b;
-          margin: 0;
-          padding: 24px;
-        }
-        .header-bar {
-          border-bottom: 2px solid #e04f16;
-          padding-bottom: 12px;
-          margin-bottom: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .header-logo {
-          font-size: 14pt;
-          font-weight: 900;
-          color: #e04f16;
-          letter-spacing: 1px;
-        }
-        .header-meta {
-          font-size: 9pt;
-          color: #64748b;
-        }
-        h1 {
-          font-size: 22pt;
-          font-weight: 800;
-          color: #0f172a;
-          margin-top: 16px;
-          margin-bottom: 12px;
-        }
-        h2 {
-          font-size: 15pt;
-          font-weight: 700;
-          color: #1e293b;
-          margin-top: 24px;
-          margin-bottom: 8px;
-          border-bottom: 1px solid #e2e8f0;
-          padding-bottom: 4px;
-        }
-        h3 {
-          font-size: 12pt;
-          font-weight: 600;
-          color: #334155;
-          margin-top: 16px;
-          margin-bottom: 6px;
-        }
-        p { margin-top: 0; margin-bottom: 10pt; text-align: justify; }
-        blockquote {
-          border-left: 3px solid #e04f16;
-          margin: 14px 0;
-          padding: 8px 14px;
-          background: #fff7ed;
-          color: #9a3412;
-          border-radius: 0 4px 4px 0;
-        }
-        table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 16px 0;
-          page-break-inside: avoid;
-        }
-        th, td {
-          border: 1px solid #cbd5e1;
-          padding: 8px 10px;
-          font-size: 10pt;
-          text-align: left;
-        }
-        th {
-          background-color: #f8fafc;
-          font-weight: 600;
-          color: #0f172a;
-        }
-        pre {
-          background-color: #0f172a;
-          color: #f8fafc;
-          padding: 12px;
-          border-radius: 6px;
-          font-size: 9.5pt;
-          white-space: pre-wrap;
-          page-break-inside: avoid;
-        }
-        code {
-          font-family: 'Consolas', monospace;
-          background-color: #f1f5f9;
-          padding: 2px 4px;
-          border-radius: 3px;
-          font-size: 9pt;
-        }
-        .footer-note {
-          margin-top: 40px;
-          padding-top: 12px;
-          border-top: 1px solid #e2e8f0;
-          font-size: 9pt;
-          color: #94a3b8;
-          text-align: center;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header-bar">
-        <div class="header-logo">DOCFORGE STUDIO</div>
-        <div class="header-meta">Air-Gapped Intelligence · Exported ${new Date().toLocaleDateString()}</div>
-      </div>
-      ${renderedContent}
-      <div class="footer-note">Generated by DOCFORGE Document Intelligence Platform · Cryptographic Checksum Verified</div>
-      <script>
-        window.onload = function() {
-          setTimeout(function() {
-            window.print();
-          }, 300);
-        };
-      </script>
-    </body>
-    </html>
-  `)
-  printWindow.document.close()
+        const cellText = escapePdfText(row[cIdx] || '').slice(0, Math.floor(colWidth / 5.5))
+        const fontTag = isHeader ? '/F2' : '/F1'
+        const color = isHeader ? '0.08 0.12 0.20' : '0.15 0.18 0.25'
+        pagesOps[curPageIdx].push(
+          `BT ${fontTag} 8.5 Tf ${color} rg ${cellX + 5} ${curY - 10} Td (${cellText}) Tj ET`
+        )
+      }
+      curY -= rowHeight
+    }
+    curY -= 8
+    tableBuffer = []
+  }
+
+  const flushCode = () => {
+    if (codeBuffer.length === 0) return
+    const blockHeight = codeBuffer.length * 13 + 12
+    checkPageSpace(Math.min(blockHeight, 150))
+    pagesOps[curPageIdx].push(
+      `0.95 0.96 0.98 rg 0.85 0.88 0.92 RG 0.5 w ${marginX} ${curY - blockHeight + 10} ${maxContentWidth} ${blockHeight} re B`
+    )
+    for (const codeLine of codeBuffer) {
+      checkPageSpace(13)
+      const esc = escapePdfText(codeLine).slice(0, 85)
+      pagesOps[curPageIdx].push(
+        `BT /F4 8.5 Tf 0.15 0.2 0.3 rg ${marginX + 8} ${curY} Td (${esc}) Tj ET`
+      )
+      curY -= 13
+    }
+    curY -= 10
+    codeBuffer = []
+  }
+
+  const wrapText = (text: string, maxCharsPerLine: number): string[] => {
+    const words = text.split(/\s+/)
+    const lines: string[] = []
+    let curLine = ''
+    for (const w of words) {
+      if ((curLine + ' ' + w).trim().length <= maxCharsPerLine) {
+        curLine = (curLine + ' ' + w).trim()
+      } else {
+        if (curLine) lines.push(curLine)
+        curLine = w
+      }
+    }
+    if (curLine) lines.push(curLine)
+    return lines
+  }
+
+  for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
+    const line = rawLines[lIdx].trim()
+
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        flushCode()
+        inCodeBlock = false
+      } else {
+        inCodeBlock = true
+      }
+      continue
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(rawLines[lIdx])
+      continue
+    }
+
+    if (line.startsWith('|') && line.endsWith('|')) {
+      if (line.includes('---')) continue
+      const cells = line.split('|').slice(1, -1).map(c => c.trim())
+      tableBuffer.push(cells)
+      continue
+    } else {
+      flushTable()
+    }
+
+    if (line.startsWith('<!-- Page') || line === '---') {
+      if (pagesOps[curPageIdx].length > 0) {
+        newPage()
+      }
+      continue
+    }
+
+    if (!line) {
+      curY -= 6
+      continue
+    }
+
+    // Heading 1
+    if (line.startsWith('# ')) {
+      checkPageSpace(35)
+      curY -= 12
+      const text = escapePdfText(line.replace(/^#\s+/, ''))
+      pagesOps[curPageIdx].push(
+        `BT /F2 16 Tf 0.06 0.09 0.16 rg ${marginX} ${curY} Td (${text}) Tj ET`
+      )
+      curY -= 20
+      pagesOps[curPageIdx].push(
+        `0.88 0.31 0.09 RG 1.5 w ${marginX} ${curY + 8} m ${marginX + 60} ${curY + 8} l S`
+      )
+      curY -= 6
+      continue
+    }
+
+    // Heading 2
+    if (line.startsWith('## ')) {
+      checkPageSpace(28)
+      curY -= 10
+      const text = escapePdfText(line.replace(/^##\s+/, ''))
+      pagesOps[curPageIdx].push(
+        `BT /F2 12.5 Tf 0.12 0.16 0.24 rg ${marginX} ${curY} Td (${text}) Tj ET`
+      )
+      curY -= 16
+      continue
+    }
+
+    // Heading 3
+    if (line.startsWith('### ')) {
+      checkPageSpace(22)
+      curY -= 8
+      const text = escapePdfText(line.replace(/^###\s+/, ''))
+      pagesOps[curPageIdx].push(
+        `BT /F2 10.5 Tf 0.20 0.25 0.35 rg ${marginX} ${curY} Td (${text}) Tj ET`
+      )
+      curY -= 14
+      continue
+    }
+
+    // Blockquote
+    if (line.startsWith('>')) {
+      const qText = line.replace(/^>\s*/, '')
+      const wrapped = wrapText(qText, 76)
+      const qHeight = wrapped.length * 13 + 6
+      checkPageSpace(qHeight)
+      pagesOps[curPageIdx].push(
+        `0.88 0.31 0.09 rg ${marginX} ${curY - qHeight + 11} 3 ${qHeight} re f`
+      )
+      for (const wl of wrapped) {
+        pagesOps[curPageIdx].push(
+          `BT /F3 9.5 Tf 0.45 0.25 0.1 rg ${marginX + 10} ${curY} Td (${escapePdfText(wl)}) Tj ET`
+        )
+        curY -= 13
+      }
+      curY -= 6
+      continue
+    }
+
+    // Bullet lists
+    if (line.match(/^[\*\-]\s+/)) {
+      const bText = line.replace(/^[\*\-]\s+/, '')
+      const wrapped = wrapText(bText, 78)
+      checkPageSpace(wrapped.length * 13)
+      for (let i = 0; i < wrapped.length; i++) {
+        const prefix = i === 0 ? '* ' : '  '
+        pagesOps[curPageIdx].push(
+          `BT /F1 9.5 Tf 0.15 0.18 0.25 rg ${marginX + 10} ${curY} Td (${escapePdfText(prefix + wrapped[i])}) Tj ET`
+        )
+        curY -= 13
+      }
+      continue
+    }
+
+    // Regular paragraph
+    const wrapped = wrapText(line, 82)
+    checkPageSpace(wrapped.length * 13 + 4)
+    for (const wl of wrapped) {
+      pagesOps[curPageIdx].push(
+        `BT /F1 9.5 Tf 0.15 0.18 0.25 rg ${marginX} ${curY} Td (${escapePdfText(wl)}) Tj ET`
+      )
+      curY -= 13
+    }
+    curY -= 4
+  }
+
+  flushTable()
+  flushCode()
+
+  const totalPages = pagesOps.length
+  for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+    const headerText = escapePdfText(`DOCFORGE STUDIO · ${title}`).slice(0, 60)
+    const footerText = escapePdfText(`DOCFORGE Document Intelligence · Page ${pIdx + 1} of ${totalPages}`)
+
+    pagesOps[pIdx].unshift(
+      `0.85 0.85 0.88 RG 0.5 w ${marginX} 805 m ${marginX + maxContentWidth} 805 l S`,
+      `BT /F1 7.5 Tf 0.5 0.55 0.62 rg ${marginX} 812 Td (${headerText}) Tj ET`
+    )
+
+    pagesOps[pIdx].push(
+      `0.85 0.85 0.88 RG 0.5 w ${marginX} 42 m ${marginX + maxContentWidth} 42 l S`,
+      `BT /F1 7.5 Tf 0.5 0.55 0.62 rg ${marginX + 160} 30 Td (${footerText}) Tj ET`
+    )
+  }
+
+  const numPages = pagesOps.length
+  const parts: Uint8Array[] = []
+  const offsets: number[] = [0]
+  const enc = new TextEncoder()
+
+  const pushString = (s: string) => {
+    parts.push(enc.encode(s))
+  }
+
+  const addObj = (objNum: number, content: string) => {
+    offsets.push(parts.reduce((acc, p) => acc + p.length, 0))
+    pushString(`${objNum} 0 obj\n${content}\nendobj\n`)
+  }
+
+  pushString('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
+  addObj(1, '<< /Type /Catalog /Pages 2 0 R >>')
+
+  const kids = Array.from({ length: numPages }, (_, i) => `${3 + 2 * i} 0 R`).join(' ')
+  addObj(2, `<< /Type /Pages /Kids [${kids}] /Count ${numPages} >>`)
+
+  for (let i = 0; i < numPages; i++) {
+    const pageObjNum = 3 + 2 * i
+    const streamObjNum = 4 + 2 * i
+
+    addObj(pageObjNum,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] ` +
+      `/Resources << /Font << ` +
+      `/F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> ` +
+      `/F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> ` +
+      `/F3 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >> ` +
+      `/F4 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> ` +
+      `>> >> /Contents ${streamObjNum} 0 R >>`
+    )
+
+    const streamBody = pagesOps[i].join('\n')
+    const streamBytes = enc.encode(streamBody)
+    offsets.push(parts.reduce((acc, p) => acc + p.length, 0))
+    pushString(`${streamObjNum} 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n`)
+    parts.push(streamBytes)
+    pushString('\nendstream\nendobj\n')
+  }
+
+  const startXref = parts.reduce((acc, p) => acc + p.length, 0)
+  const totalObjs = 2 + 2 * numPages
+  let xrefStr = `xref\n0 ${totalObjs + 1}\n0000000000 65535 f \n`
+  for (let o = 1; o <= totalObjs; o++) {
+    const off = offsets[o] || 0
+    xrefStr += `${off.toString().padStart(10, '0')} 00000 n \n`
+  }
+  xrefStr += `trailer\n<< /Size ${totalObjs + 1} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`
+  pushString(xrefStr)
+
+  const totalLength = parts.reduce((acc, p) => acc + p.length, 0)
+  const resultBytes = new Uint8Array(totalLength)
+  let offset = 0
+  for (const part of parts) {
+    resultBytes.set(part, offset)
+    offset += part.length
+  }
+  return resultBytes
+}
+
+/** 5. Export Converted Document as Genuine Vector PDF */
+export function exportDocumentAsPdf(filename: string, title: string, markdown: string): void {
+  const baseName = filename.replace(/\.[^.]+$/, '') || 'document'
+  const pdfBytes = buildVectorPdfBytes(title || baseName, markdown)
+  const pdfBuffer = new ArrayBuffer(pdfBytes.byteLength)
+  new Uint8Array(pdfBuffer).set(pdfBytes)
+  const blob = new Blob([pdfBuffer], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${baseName}-converted.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/** Legacy alias for backwards compatibility */
+export function downloadPdfDocument(filename: string, title: string, markdown: string): void {
+  exportDocumentAsPdf(filename, title, markdown)
 }
 
 // ── Smart Client-Side Grounded RAG Answering ─────────────────────────────────

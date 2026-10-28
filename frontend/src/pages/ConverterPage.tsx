@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Upload, FileText, Copy, Download, Check, X,
-  ArrowRight, Layers, MessageSquare, Trash2, Plus, CheckCircle2, FileCheck,
+  ArrowRight, Layers, MessageSquare, Trash2, Plus, CheckCircle2, FileCheck, FileDown,
   RotateCw, Scan, Play, Pause, AlignLeft, FileCode, Table, Image,
   Gauge, Monitor, Cpu, Zap, Settings, ShieldCheck
 } from 'lucide-react'
 import type { ConvertResult, BatchFileItem } from '../types'
 import TokenSavingsPanel from '../components/TokenSavingsPanel'
 import EngineConfigModal from '../components/EngineConfigModal'
-import { downloadMarkdownFile, downloadWordDoc, downloadPdfDocument } from '../utils/documentUtils'
+import { downloadMarkdownFile, downloadWordDoc, exportDocumentAsPdf, downloadOriginalFile } from '../utils/documentUtils'
 
 type Tab = 'preview' | 'raw'
 
@@ -494,11 +494,13 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
     setActiveResultId(null)
   }
 
-  const downloadSingle = (res: ConvertResult, format: 'md' | 'word' | 'pdf' = 'md') => {
-    if (format === 'word') {
+  const downloadSingle = (res: ConvertResult, format: 'md' | 'word' | 'pdf' | 'original' = 'md', originalFile?: File) => {
+    if (format === 'original' && originalFile) {
+      downloadOriginalFile(originalFile)
+    } else if (format === 'word') {
       downloadWordDoc(res.fileName, res.fileName, res.markdown)
     } else if (format === 'pdf') {
-      downloadPdfDocument(res.fileName, res.fileName, res.markdown)
+      exportDocumentAsPdf(res.fileName, res.fileName, res.markdown)
     } else {
       downloadMarkdownFile(res.fileName, res.markdown)
     }
@@ -1876,28 +1878,37 @@ $$`}
                               <button
                                 className="btn-aarambh-outline"
                                 style={{ fontSize: '11px', padding: '6px 10px' }}
-                                onClick={() => downloadSingle(item.result!, 'md')}
-                                title="Download Markdown (.md)"
+                                onClick={() => downloadSingle(item.result!, 'md', item.file)}
+                                title="Download Extracted Markdown (.md)"
                               >
                                 <Download size={13} /> .MD
                               </button>
 
                               <button
                                 className="btn-aarambh-outline"
-                                style={{ fontSize: '11px', padding: '6px 10px', color: '#38bdf8' }}
-                                onClick={() => downloadSingle(item.result!, 'word')}
-                                title="Download Word Document (.doc)"
+                                style={{ fontSize: '11px', padding: '6px 10px', color: '#10b981' }}
+                                onClick={() => downloadSingle(item.result!, 'original', item.file)}
+                                title="Download Original Uploaded File (Bytes Unchanged)"
                               >
-                                <FileText size={13} /> DOC
+                                <FileDown size={13} /> ORIGINAL
                               </button>
 
                               <button
                                 className="btn-aarambh-outline"
                                 style={{ fontSize: '11px', padding: '6px 10px', color: '#e04f16' }}
-                                onClick={() => downloadSingle(item.result!, 'pdf')}
-                                title="Download / Print PDF"
+                                onClick={() => downloadSingle(item.result!, 'pdf', item.file)}
+                                title="Export Converted Document as Genuine Vector PDF"
                               >
-                                <FileCheck size={13} /> PDF
+                                <FileCheck size={13} /> EXPORT PDF
+                              </button>
+
+                              <button
+                                className="btn-aarambh-outline"
+                                style={{ fontSize: '11px', padding: '6px 10px', color: '#38bdf8' }}
+                                onClick={() => downloadSingle(item.result!, 'word', item.file)}
+                                title="Download Word Document (.doc)"
+                              >
+                                <FileText size={13} /> DOC
                               </button>
 
                               <button
@@ -1978,26 +1989,34 @@ $$`}
                       </button>
                       <button
                         className="btn-aarambh-outline"
-                        onClick={() => downloadSingle(activeItem.result!, 'md')}
-                        title="Download Markdown (.md)"
+                        onClick={() => downloadSingle(activeItem.result!, 'md', activeItem.file)}
+                        title="Download Extracted Markdown (.md)"
                       >
                         <Download size={14} /> DOWNLOAD .MD
                       </button>
                       <button
                         className="btn-aarambh-outline"
-                        onClick={() => downloadSingle(activeItem.result!, 'word')}
+                        onClick={() => downloadSingle(activeItem.result!, 'original', activeItem.file)}
+                        title="Download Original Uploaded File (Bytes Unchanged)"
+                        style={{ color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                      >
+                        <FileDown size={14} /> ORIGINAL
+                      </button>
+                      <button
+                        className="btn-aarambh-outline"
+                        onClick={() => downloadSingle(activeItem.result!, 'pdf', activeItem.file)}
+                        title="Export Converted Document as Genuine Vector PDF"
+                        style={{ color: '#e04f16', borderColor: 'rgba(224, 79, 22, 0.4)' }}
+                      >
+                        <FileCheck size={14} /> EXPORT PDF
+                      </button>
+                      <button
+                        className="btn-aarambh-outline"
+                        onClick={() => downloadSingle(activeItem.result!, 'word', activeItem.file)}
                         title="Download Microsoft Word Document (.doc)"
                         style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
                       >
                         <FileText size={14} /> WORD (.DOC)
-                      </button>
-                      <button
-                        className="btn-aarambh-outline"
-                        onClick={() => downloadSingle(activeItem.result!, 'pdf')}
-                        title="Download / Print as PDF Document"
-                        style={{ color: '#e04f16', borderColor: 'rgba(224, 79, 22, 0.4)' }}
-                      >
-                        <FileCheck size={14} /> PDF
                       </button>
                       <button
                         className="btn-aarambh-primary"
