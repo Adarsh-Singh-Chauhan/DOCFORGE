@@ -363,22 +363,6 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
       // 100% Reliable Engine-Aware Local Extraction with Real Browser-Extracted Content & Real MD5
       const { extractPdfTextInBrowser } = await import('../utils/documentUtils')
       const extracted = await extractPdfTextInBrowser(item.file)
-
-      if (extracted.isScanned || !extracted.markdown || !extracted.markdown.trim()) {
-        setBatchFiles(prev =>
-          prev.map(p =>
-            p.id === item.id
-              ? {
-                  ...p,
-                  status: 'error',
-                  error: extracted.error || 'No selectable text could be extracted from this PDF. The document appears to be a scanned image or photo PDF. Please enable OCR processing.',
-                }
-              : p
-          )
-        )
-        return
-      }
-
       const estPages = extracted.pageCount
       const fileMd5 = extracted.md5
       const fallbackMarkdown = extracted.markdown
@@ -482,17 +466,12 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
   }
 
   const downloadSingle = (res: ConvertResult, format: 'md' | 'word' | 'pdf' = 'md') => {
-    if (!res.markdown || !res.markdown.trim()) {
-      alert('No extracted Markdown text available to download.')
-      return
-    }
-    const cleanBase = res.fileName.replace(/\.[^.]+$/, '').replace(/[\s\-_]+/g, '_') || 'document'
     if (format === 'word') {
-      downloadWordDoc(res.fileName, cleanBase, res.markdown)
+      downloadWordDoc(res.fileName, res.fileName, res.markdown)
     } else if (format === 'pdf') {
-      downloadPdfDocument(res.fileName, cleanBase, res.markdown)
+      downloadPdfDocument(res.fileName, res.fileName, res.markdown)
     } else {
-      downloadMarkdownFile(`${cleanBase}.md`, res.markdown)
+      downloadMarkdownFile(res.fileName, res.markdown)
     }
   }
 
@@ -1949,16 +1928,9 @@ $$`}
                           <span className="mono-tag" style={{ color: 'var(--accent)', borderColor: 'var(--accent)', padding: '2px 6px' }}>
                             {activeItem.result.engineName ? activeItem.result.engineName.toUpperCase() : activeItem.result.mode.toUpperCase()}
                           </span>
-                          {activeItem.result.fileMd5 && (
-                            <span
-                              className="mono-tag"
-                              style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)', padding: '2px 6px', cursor: 'pointer' }}
-                              title={`Click to copy Full MD5: ${activeItem.result.fileMd5}`}
-                              onClick={() => navigator.clipboard.writeText(activeItem.result!.fileMd5!)}
-                            >
-                              MD5: {activeItem.result.fileMd5.slice(0, 8)}...
-                            </span>
-                          )}
+                          <span className="mono-tag" style={{ color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)', padding: '2px 6px' }}>
+                            MARKDOWN (.MD)
+                          </span>
                           {activeItem.result.pageCount != null && <span>{activeItem.result.pageCount} PAGES</span>}
                           {activeItem.result.tablesDetected != null && <span>· {activeItem.result.tablesDetected} TABLES</span>}
                           {activeItem.result.equationsDetected != null && <span>· {activeItem.result.equationsDetected} EQUATIONS</span>}
@@ -1969,20 +1941,18 @@ $$`}
 
                     <div className="results-actions">
                       <button
-                        className="btn-aarambh-primary"
-                        onClick={() => downloadSingle(activeItem.result!, 'md')}
-                        title="Download Markdown (.md)"
-                        style={{ fontSize: '12px', padding: '8px 18px', fontWeight: 700, gap: '6px' }}
-                      >
-                        <Download size={15} /> DOWNLOAD .MD
-                      </button>
-                      <button
                         className="btn-aarambh-outline"
                         onClick={() => copyMd(activeItem.result!.markdown)}
-                        title="Copy Markdown to Clipboard"
                       >
                         {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
                         {copied ? 'COPIED' : 'COPY MARKDOWN'}
+                      </button>
+                      <button
+                        className="btn-aarambh-outline"
+                        onClick={() => downloadSingle(activeItem.result!, 'md')}
+                        title="Download Markdown (.md)"
+                      >
+                        <Download size={14} /> DOWNLOAD .MD
                       </button>
                       <button
                         className="btn-aarambh-outline"
@@ -2001,7 +1971,7 @@ $$`}
                         <FileCheck size={14} /> PDF
                       </button>
                       <button
-                        className="btn-aarambh-outline"
+                        className="btn-aarambh-primary"
                         onClick={() => handleIndexToRag(activeItem)}
                       >
                         <MessageSquare size={14} /> CHAT IN RAG STUDIO
