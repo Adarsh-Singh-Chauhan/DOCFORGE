@@ -32,6 +32,12 @@ dependencies = [
     "anthropic>=0.69.0,<1",
     "openai>=2.2.0,<3",
     "scikit-learn>=1.6.1,<2",
+    "rapidocr-onnxruntime>=1.2.0",
+    "opencv-python>=4.5.0",
+    "onnxruntime>=1.16.0",
+    "pypdfium2>=4.30.0",
+    "pypdf>=4.0.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [project.urls]

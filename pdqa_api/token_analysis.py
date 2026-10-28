@@ -22,6 +22,26 @@ class PdfTextInspection:
 
 def inspect_pdf_text(path: str) -> PdfTextInspection:
     """Read selectable text and detect embedded image pages without running OCR."""
+    ext = path.lower().rsplit(".", 1)[-1] if "." in path else ""
+    if ext in ["jpg", "jpeg", "png", "webp", "bmp"]:
+        try:
+            from PIL import Image
+            with Image.open(path) as img:
+                w, h = img.size
+                fmt = img.format or "Image"
+            return PdfTextInspection(
+                page_count=1,
+                extracted_text=f"Image Document [{fmt}] {w}x{h} px",
+                extracted_characters=len(f"Image Document [{fmt}] {w}x{h} px"),
+                text_page_count=0,
+                image_page_count=1,
+                coverage_percent=0.0,
+                baseline_status="ocr_required",
+                baseline_reason="Visual image format; requires optical character recognition (OCR)."
+            )
+        except Exception as e:
+            return PdfTextInspection(1, "", 0, 0, 1, 0.0, "unavailable", f"Could not inspect image: {e}")
+
     import pypdfium2 as pdfium
     import pypdfium2.raw as pdfraw
 

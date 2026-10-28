@@ -41,7 +41,7 @@ from pdqa_api.token_analysis import inspect_pdf_text
 from pdqa_api.openai_counting import count_pdf_and_markdown, unavailable_count_result
 from pdqa_api.engines import (
     get_engine_statuses, select_auto_engine,
-    run_docling_conversion, run_mistral_ocr,
+    run_docling_conversion, run_image_ocr_conversion, run_mistral_ocr,
     run_mathpix_ocr, run_llamaparse,
     is_mistral_configured, is_mathpix_configured, is_llamaparse_configured
 )
@@ -318,6 +318,37 @@ async def convert_pdf(
                 "baseline_status": "complete",
                 "baseline_reason": "Native tabular CSV converted to Markdown table",
                 "coverage_percent": 100.0,
+            })()
+        elif file_ext in ["jpg", "jpeg", "png", "webp", "bmp"]:
+            req_engine = (engine or "auto").lower()
+            if req_engine == "mistral" or (req_engine == "auto" and cloud_consent and is_mistral_configured()):
+                chosen_engine = "mistral"
+                engine_name = "Mistral OCR API"
+                engine_type = "cloud"
+                eng_res = await run_in_threadpool(run_mistral_ocr, file_bytes, filename)
+            else:
+                chosen_engine = "docling"
+                engine_name = "Local Neural OCR Engine"
+                engine_type = "local"
+                eng_res = await run_in_threadpool(run_image_ocr_conversion, upload_path, file_bytes, filename)
+
+            text = eng_res.markdown
+            page_count = 1
+            tables_detected = eng_res.tables_detected
+            equations_detected = eng_res.equations_detected
+            figures_detected = 1
+            actual_mode = "ocr"
+            baseline_available = bool(text.strip())
+            baseline_chars = len(text)
+            baseline_words = len(text.split())
+            inspection = type("Inspection", (), {
+                "page_count": 1,
+                "text_page_count": 1 if baseline_available else 0,
+                "image_page_count": 1,
+                "extracted_characters": len(text),
+                "baseline_status": "complete" if baseline_available else "unavailable",
+                "baseline_reason": "High-fidelity OCR extraction via RapidOCR" if baseline_available else "No readable text detected in image",
+                "coverage_percent": 100.0 if baseline_available else 0.0,
             })()
         else:
             lock_wait_started = time.perf_counter()

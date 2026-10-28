@@ -164,7 +164,7 @@ async function decompressFlateBytes(bytes: Uint8Array): Promise<string | null> {
   if (typeof DecompressionStream === 'undefined') return null
   for (const fmt of ['deflate', 'deflate-raw'] as const) {
     try {
-      const resp = new Response(bytes)
+      const resp = new Response(bytes.buffer as ArrayBuffer)
       const decompStream = resp.body!.pipeThrough(new DecompressionStream(fmt))
       const buf = await new Response(decompStream).arrayBuffer()
       return new TextDecoder('latin1').decode(buf)
@@ -208,7 +208,6 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
     const loadingTask = pdfjsLib.getDocument({
       data: bytes,
       useSystemFonts: true,
-      isEvalSupported: false,
     })
     const pdf = await loadingTask.promise
     const numPages = pdf.numPages
