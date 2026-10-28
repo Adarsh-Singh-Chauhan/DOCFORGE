@@ -164,7 +164,9 @@ async function decompressFlateBytes(bytes: Uint8Array): Promise<string | null> {
   if (typeof DecompressionStream === 'undefined') return null
   for (const fmt of ['deflate', 'deflate-raw'] as const) {
     try {
-      const resp = new Response(bytes)
+      const copy = new Uint8Array(bytes.byteLength)
+      copy.set(bytes)
+      const resp = new Response(copy.buffer)
       const decompStream = resp.body!.pipeThrough(new DecompressionStream(fmt))
       const buf = await new Response(decompStream).arrayBuffer()
       return new TextDecoder('latin1').decode(buf)
