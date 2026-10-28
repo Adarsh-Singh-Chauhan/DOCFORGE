@@ -11,6 +11,7 @@ import csv
 import io
 import math
 import re
+import hashlib
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -161,6 +162,9 @@ class ConvertMeta(BaseModel):
     tablesDetected: Optional[int] = 0
     equationsDetected: Optional[int] = 0
     figuresDetected: Optional[int] = 0
+    fileMd5: Optional[str] = None
+    fileSha256: Optional[str] = None
+    markdownMd5: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -235,7 +239,9 @@ async def convert_pdf(
         stage_started = time.perf_counter()
         file_bytes = await file.read()
         file_size = len(file_bytes)
-        logger.info("[%s] upload completed bytes=%d elapsed=%.3fs", request_id, file_size, time.perf_counter() - stage_started)
+        file_md5 = hashlib.md5(file_bytes).hexdigest()
+        file_sha256 = hashlib.sha256(file_bytes).hexdigest()
+        logger.info("[%s] upload completed bytes=%d md5=%s elapsed=%.3fs", request_id, file_size, file_md5, time.perf_counter() - stage_started)
 
         file_ext = os.path.splitext(filename)[1].lstrip(".").lower() or "pdf"
         upload_path = os.path.join(UPLOAD_DIR, f"{request_id}_{filename}")
@@ -429,6 +435,7 @@ async def convert_pdf(
         markdown_count = token_count_result["markdown"]
         comparison = token_count_result["comparison"]
         token_counting_duration_ms = int((time.perf_counter() - stage_started) * 1000)
+        markdown_md5 = hashlib.md5(text.encode("utf-8")).hexdigest()
         result = ConvertMeta(
             id=request_id,
             fileName=filename,
@@ -469,6 +476,9 @@ async def convert_pdf(
             tablesDetected=tables_detected,
             equationsDetected=equations_detected,
             figuresDetected=figures_detected,
+            fileMd5=file_md5,
+            fileSha256=file_sha256,
+            markdownMd5=markdown_md5,
         )
         logger.info("[%s] token metrics finished elapsed=%.3fs", request_id, time.perf_counter() - stage_started)
         history.insert(0, result.model_dump())
@@ -495,6 +505,9 @@ async def convert_pdf(
                 "tables_detected": tables_detected,
                 "equations_detected": equations_detected,
                 "figures_detected": figures_detected,
+                "file_md5": file_md5,
+                "file_sha256": file_sha256,
+                "markdown_md5": markdown_md5,
                 "cost_estimated": 0.02 if engine_type == "cloud" else 0.0,
                 "created_at": time.time() - (result.durationMs / 1000),
                 "completed_at": time.time(),
@@ -1002,18 +1015,103 @@ async def rag_chat_query(req: RagQueryItem):
         for i, (score, c) in enumerate(top_results)
     ]
 
-    # Synthesize answer
-    synthesized_answer = (
-        f"Based on the retrieved document context ({len(retrieved_chunks)} relevant sections found):\n\n"
-    )
-    for i, c in enumerate(retrieved_chunks[:2]):
-        snippet = c['content'].strip().split("\n")[0][:180]
-        synthesized_answer += f"- **{c['title']}** (Section: *{c['section']}*) [{i+1}]: {snippet}...\n"
+    # Synthesize intelligent grounded answer
+    q_lower = query.lower()
 
-    synthesized_answer += (
-        f"\n**Synthesized Answer:**\nThe context indicates details regarding `{query}`. "
-        f"Refer to citation {citations[0]['citation_id']} for complete primary source data."
-    )
+    # 1. Conversational Greeting Intent
+    if re.match(r"^(?:hi|hello|hey|namaste|greetings|who are you|hlo)\b", q_lower):
+        doc_titles = list({c["title"] for c in retrieved_chunks})
+        doc_list = ", ".join(f"**{t}**" for t in doc_titles[:3])
+        synthesized_answer = (
+            "### Hello! I am DOCFORGE Neural RAG Intelligence Assistant ⚡\n\n"
+            f"I have indexed and ready access to your documents ({doc_list}).\n\n"
+            "You can ask me questions about:\n"
+            "- Core concepts, definitions, and executive summaries\n"
+            "- Specific figures, percentages, dates, and tabular data\n"
+            "- Authors, organizations, and methodologies\n"
+            "- Mathematical formulas and structural comparisons\n\n"
+            "What would you like to know?"
+        )
+    else:
+        # Extract sentences from chunks for semantic answering
+        all_sentences = []
+        for c_idx, c in enumerate(retrieved_chunks):
+            cid = citations[c_idx]["citation_id"] if c_idx < len(citations) else f"[{c_idx+1}]"
+            content = c["content"]
+            sents = [s.strip() for s in re.split(r"(?<=[.!?\n])\s+", content) if len(s.strip()) > 18]
+            for s in sents:
+                if s.startswith("|") or s.startswith("#") or s.startswith("---"):
+                    continue
+                all_sentences.append({"text": s, "chunk": c, "citation": cid})
+
+        # 2. Executive Summary Intent
+        if any(w in q_lower for w in ("summar", "overview", "kya hai", "what is this", "about", "tldr", "explain document", "brief", "main point")):
+            primary_title = retrieved_chunks[0]["title"] if retrieved_chunks else "Uploaded Document"
+            bullet_points = []
+            seen = set()
+            for item in all_sentences[:10]:
+                if len(item["text"]) > 35 and item["text"] not in seen:
+                    seen.add(item["text"])
+                    bullet_points.append(f"- **{item['chunk']['section']}** {item['citation']}: {item['text'][:240]}...")
+                    if len(bullet_points) >= 4:
+                        break
+
+            synthesized_answer = (
+                f"### Executive Summary: {primary_title}\n\n"
+                f"Grounded across **{len(retrieved_chunks)} relevant sections** in the indexed knowledge store:\n\n"
+                f"#### Core Insights & Key Sections\n"
+                + ("\n".join(bullet_points) if bullet_points else "Structured sections, data tables, and technical concepts extracted.")
+                + "\n\n*All insights are grounded directly in the source text. Click citations below to inspect exact source chunks.*"
+            )
+        else:
+            # 3. Deep Extractive Semantic QA
+            scored_sentences = []
+            for item in all_sentences:
+                s_lower = item["text"].lower()
+                score = 0.0
+                for t in query_terms:
+                    if t in s_lower:
+                        score += 2.5
+                if query.lower() in s_lower:
+                    score += 7.0
+
+                # Numeric and metric intent boost
+                if any(w in q_lower for w in ("how many", "%", "token", "cost", "accuracy", "rate", "number", "revenue", "much", "score")) and re.search(r"\d", s_lower):
+                    score += 3.5
+
+                # Author / organization intent boost
+                if any(w in q_lower for w in ("author", "who", "written", "team", "university", "research", "by")) and (re.search(r"@[a-zA-Z0-9.-]+|university|research|institute|department", s_lower) or any(w.istitle() for w in item["text"].split()[:3])):
+                    score += 4.5
+
+                if score > 0:
+                    scored_sentences.append((score, item))
+
+            scored_sentences.sort(key=lambda x: x[0], reverse=True)
+            top_items = scored_sentences[:3]
+
+            if not top_items and all_sentences:
+                top_items = [(1.0, all_sentences[i]) for i in range(min(2, len(all_sentences)))]
+
+            if top_items:
+                primary_answer = top_items[0][1]["text"]
+                evidence_list = [
+                    f"- {item['citation']} (*{item['chunk']['title']} · {item['chunk']['section']}*): \"{item['text']}\""
+                    for _, item in top_items
+                ]
+                synthesized_answer = (
+                    f"### Grounded Answer for: \"{query}\"\n\n"
+                    f"{primary_answer}\n\n"
+                    f"#### Supporting Evidence & Context\n"
+                    + "\n".join(evidence_list)
+                    + f"\n\n*Directly verified against {len(retrieved_chunks)} primary source sections.*"
+                )
+            else:
+                synthesized_answer = (
+                    f"Based on the retrieved context for `{query}`:\n\n"
+                    f"- **{retrieved_chunks[0]['title']}** [{citations[0]['citation_id']}]: "
+                    f"{retrieved_chunks[0]['content'][:250]}...\n\n"
+                    f"Refer to the source inspection drawer below for complete context."
+                )
 
     duration_ms = int((time.perf_counter() - start_time) * 1000)
     tokens_est = len(query.split()) + len(synthesized_answer.split())

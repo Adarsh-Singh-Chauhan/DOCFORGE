@@ -38,6 +38,9 @@ export interface ConvertResult {
   tablesDetected?: number
   equationsDetected?: number
   figuresDetected?: number
+  fileMd5?: string
+  fileSha256?: string
+  markdownMd5?: string
   error?: string | null
 }
 
@@ -123,6 +126,9 @@ export interface OcrHistoryRecord {
   tables_detected?: number
   equations_detected?: number
   figures_detected?: number
+  file_md5?: string
+  file_sha256?: string
+  markdown_md5?: string
   error?: string | null
   cost_estimated?: number
   created_at: number

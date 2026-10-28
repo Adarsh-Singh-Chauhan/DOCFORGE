@@ -249,15 +249,21 @@ Ask any question about your documents. Every response is **strictly grounded in 
       if (file.name.endsWith('.md') || file.name.endsWith('.txt')) {
         text = await file.text()
       } else if (file.name.endsWith('.pdf')) {
-        const formData = new FormData()
-        formData.append('file', file)
-        const res = await fetch('/api/convert', { method: 'POST', body: formData })
-        const data = await res.json()
-        if (data.success && data.result?.markdown) {
-          text = data.result.markdown
-        } else {
-          // Simulation for demonstration if backend is starting
-          text = `# ${file.name}\n\nDocument ingested locally into DOCFORGE RAG Studio.\n\n## Abstract\nThis document contains structured analysis, extracted tables, and references.\n\n## Key Metrics\n- Accuracy: 99.4%\n- Processing: Local Air-Gapped\n- Token window reduction: 78%`
+        try {
+          const formData = new FormData()
+          formData.append('file', file)
+          const res = await fetch('/api/convert', { method: 'POST', body: formData })
+          const data = await res.json().catch(() => null)
+          if (data?.success && data.result?.markdown) {
+            text = data.result.markdown
+          } else {
+            throw new Error('Backend offline')
+          }
+        } catch {
+          // Robust zero-dependency client-side PDF extraction with real MD5 checksum
+          const { extractPdfTextInBrowser } = await import('../utils/documentUtils')
+          const extracted = await extractPdfTextInBrowser(file)
+          text = extracted.markdown
         }
       }
 
@@ -364,16 +370,9 @@ Ask any question about your documents. Every response is **strictly grounded in 
       score: Math.round(p.score * 10) / 10,
     }))
 
-    // Synthesize structured answer
-    let answer = `### Grounded Analysis for: "${userQuery}"\n\n`
-    answer += `Based on **${retrievedChunks.length} relevant sections** retrieved across selected documents:\n\n`
-
-    retrievedChunks.forEach((c, i) => {
-      const snippet = c.content.split('\n').filter(Boolean)[0]?.slice(0, 200) || c.content.slice(0, 200)
-      answer += `- **${c.title}** (Section: *${c.section}*) ${citations[i].citation_id}: "${snippet}..."\n`
-    })
-
-    answer += `\n**Key Synthesis:**\nThe indexed context verifies data regarding **${userQuery}**. All references are directly accessible in the source inspection drawer below.`
+    // Synthesize intelligent structured answer
+    const { synthesizeClientGroundedAnswer } = await import('../utils/documentUtils')
+    const answer = synthesizeClientGroundedAnswer(userQuery, retrievedChunks, citations)
 
     return { answer, citations, chunks: retrievedChunks }
   }

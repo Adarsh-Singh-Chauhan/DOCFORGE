@@ -111,17 +111,15 @@ CRITICAL INSTRUCTIONS:
     }
   }
 
-  // If Google API call failed (e.g. rate limit or network offline), provide local high-quality synthesis
+  // If Google API call failed (e.g. rate limit, invalid key, or network offline), provide local high-quality synthesis
   if (chunks.length > 0) {
-    let fallback = `### DOCFORGE Local Grounded Synthesis for: "${query}"\n\n`
-    fallback += `*Powered by Local RAG Vector Engine*\n\n`
-    fallback += `Based on **${chunks.length} context chunks** from your indexed knowledge base:\n\n`
-    chunks.forEach((c, idx) => {
-      const preview = c.content.split('\n').filter(Boolean)[0] || c.content.slice(0, 160)
-      fallback += `**[${idx + 1}] ${c.title}** (*${c.section}*):\n> "${preview.slice(0, 200)}..."\n\n`
-    })
-    fallback += `\n**Direct Answer:**\nThe indexed documents directly cover **${query}**. All relevant citations are inspectable in the source drawer below.`
-    return fallback
+    const citations = chunks.map((c, idx) => ({
+      citation_id: `[${idx + 1}]`,
+      title: c.title,
+      section: c.section,
+    }))
+    const { synthesizeClientGroundedAnswer } = await import('../utils/documentUtils')
+    return synthesizeClientGroundedAnswer(query, chunks, citations)
   }
 
   if (query.toLowerCase().match(/^(hi|hello|hii|hey|namaste|greetings)/)) {

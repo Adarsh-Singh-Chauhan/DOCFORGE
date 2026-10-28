@@ -43,6 +43,9 @@ def init_db():
             tables_detected INTEGER DEFAULT 0,
             equations_detected INTEGER DEFAULT 0,
             figures_detected INTEGER DEFAULT 0,
+            file_md5 TEXT,
+            file_sha256 TEXT,
+            markdown_md5 TEXT,
             error TEXT,
             cost_estimated REAL DEFAULT 0.0,
             created_at REAL NOT NULL,
@@ -52,6 +55,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_ocr_jobs_created_at ON ocr_jobs(created_at);
         CREATE INDEX IF NOT EXISTS idx_ocr_jobs_engine ON ocr_jobs(engine);
         CREATE INDEX IF NOT EXISTS idx_ocr_jobs_status ON ocr_jobs(status);
+        CREATE INDEX IF NOT EXISTS idx_ocr_jobs_md5 ON ocr_jobs(file_md5);
 
         CREATE TABLE IF NOT EXISTS chat_conversations (
             id TEXT PRIMARY KEY,
@@ -97,6 +101,18 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_api_usage_created ON api_usage_events(created_at);
         CREATE INDEX IF NOT EXISTS idx_api_usage_provider ON api_usage_events(provider);
         """)
+
+        # Migration: Ensure file_md5, file_sha256, markdown_md5 exist if table was previously created
+        try:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(ocr_jobs)").fetchall()]
+            if "file_md5" not in cols:
+                conn.execute("ALTER TABLE ocr_jobs ADD COLUMN file_md5 TEXT")
+            if "file_sha256" not in cols:
+                conn.execute("ALTER TABLE ocr_jobs ADD COLUMN file_sha256 TEXT")
+            if "markdown_md5" not in cols:
+                conn.execute("ALTER TABLE ocr_jobs ADD COLUMN markdown_md5 TEXT")
+        except Exception:
+            pass
 
         # Check if database is empty, seed initial baseline activity so dashboard renders rich actual data immediately
         cursor = conn.execute("SELECT COUNT(*) FROM ocr_jobs")
@@ -405,11 +421,13 @@ def save_ocr_job(job_data: Dict[str, Any]) -> str:
             id, file_name, file_type, original_size, page_count, duration_ms, conversion_duration_ms,
             engine, engine_name, engine_type, status, markdown, markdown_chars, markdown_words,
             tokens_saved, reduction_percent, tables_detected, equations_detected, figures_detected,
+            file_md5, file_sha256, markdown_md5,
             error, cost_estimated, created_at, completed_at
         ) VALUES (
             :id, :file_name, :file_type, :original_size, :page_count, :duration_ms, :conversion_duration_ms,
             :engine, :engine_name, :engine_type, :status, :markdown, :markdown_chars, :markdown_words,
             :tokens_saved, :reduction_percent, :tables_detected, :equations_detected, :figures_detected,
+            :file_md5, :file_sha256, :markdown_md5,
             :error, :cost_estimated, :created_at, :completed_at
         )
         ON CONFLICT(id) DO UPDATE SET
@@ -430,6 +448,9 @@ def save_ocr_job(job_data: Dict[str, Any]) -> str:
             tables_detected=excluded.tables_detected,
             equations_detected=excluded.equations_detected,
             figures_detected=excluded.figures_detected,
+            file_md5=excluded.file_md5,
+            file_sha256=excluded.file_sha256,
+            markdown_md5=excluded.markdown_md5,
             error=excluded.error,
             cost_estimated=excluded.cost_estimated,
             completed_at=excluded.completed_at
@@ -453,6 +474,9 @@ def save_ocr_job(job_data: Dict[str, Any]) -> str:
             "tables_detected": job_data.get("tables_detected", 0),
             "equations_detected": job_data.get("equations_detected", 0),
             "figures_detected": job_data.get("figures_detected", 0),
+            "file_md5": job_data.get("file_md5"),
+            "file_sha256": job_data.get("file_sha256"),
+            "markdown_md5": job_data.get("markdown_md5"),
             "error": job_data.get("error"),
             "cost_estimated": job_data.get("cost_estimated", 0.0),
             "created_at": job_data.get("created_at", now),
@@ -484,6 +508,7 @@ def get_ocr_jobs(
             id, file_name, file_type, original_size, page_count, duration_ms, conversion_duration_ms,
             engine, engine_name, engine_type, status, markdown_chars, markdown_words,
             tokens_saved, reduction_percent, tables_detected, equations_detected, figures_detected,
+            file_md5, file_sha256, markdown_md5,
             error, cost_estimated, created_at, completed_at
         """
     query += "FROM ocr_jobs WHERE 1=1 "

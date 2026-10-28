@@ -133,6 +133,7 @@ export default function OcrJobDetailPage({ jobId, onBack, onOpenRagChatbot }: Pr
             <div>
               <div className="mono-tag-accent" style={{ marginBottom: '4px' }}>
                 JOB ID: {job.id} · {new Date(job.created_at * 1000).toLocaleString()}
+                {job.file_md5 && ` · MD5: ${job.file_md5.slice(0, 10)}...`}
               </div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>
                 {job.file_name}
