@@ -392,7 +392,7 @@ Create a `.env` file in the project root to configure optional cloud engines:
 Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for terms.
 
 <p align="center">
-  <b>Architected & Engineered with Pride by <a href="https://github.com/Ansh-Dubey-05">Ansh Dubey</a></b>
+  <b>Architected & Engineered with Pride by <a href="https://github.com/Adarsh-Singh-Chauhan">Adarsh Singh Chauhan</a></b>
 </p>
 
 <p align="center">
