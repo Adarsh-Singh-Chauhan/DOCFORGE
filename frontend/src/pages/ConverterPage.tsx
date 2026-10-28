@@ -363,6 +363,22 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
       // 100% Reliable Engine-Aware Local Extraction with Real Browser-Extracted Content & Real MD5
       const { extractPdfTextInBrowser } = await import('../utils/documentUtils')
       const extracted = await extractPdfTextInBrowser(item.file)
+
+      if (extracted.isScanned || !extracted.markdown || !extracted.markdown.trim()) {
+        setBatchFiles(prev =>
+          prev.map(p =>
+            p.id === item.id
+              ? {
+                  ...p,
+                  status: 'error',
+                  error: extracted.error || 'No selectable text could be extracted from this PDF. The document appears to be a scanned image or photo PDF. Please enable OCR processing.',
+                }
+              : p
+          )
+        )
+        return
+      }
+
       const estPages = extracted.pageCount
       const fileMd5 = extracted.md5
       const fallbackMarkdown = extracted.markdown
@@ -466,12 +482,17 @@ export default function ConverterPage({ onOpenRagChatbot }: Props) {
   }
 
   const downloadSingle = (res: ConvertResult, format: 'md' | 'word' | 'pdf' = 'md') => {
+    if (!res.markdown || !res.markdown.trim()) {
+      alert('No extracted Markdown text available to download.')
+      return
+    }
+    const cleanBase = res.fileName.replace(/\.[^.]+$/, '').replace(/[\s\-_]+/g, '_') || 'document'
     if (format === 'word') {
-      downloadWordDoc(res.fileName, res.fileName, res.markdown)
+      downloadWordDoc(res.fileName, cleanBase, res.markdown)
     } else if (format === 'pdf') {
-      downloadPdfDocument(res.fileName, res.fileName, res.markdown)
+      downloadPdfDocument(res.fileName, cleanBase, res.markdown)
     } else {
-      downloadMarkdownFile(res.fileName, res.markdown)
+      downloadMarkdownFile(`${cleanBase}.md`, res.markdown)
     }
   }
 
@@ -1948,18 +1969,20 @@ $$`}
 
                     <div className="results-actions">
                       <button
-                        className="btn-aarambh-outline"
-                        onClick={() => copyMd(activeItem.result!.markdown)}
+                        className="btn-aarambh-primary"
+                        onClick={() => downloadSingle(activeItem.result!, 'md')}
+                        title="Download Markdown (.md)"
+                        style={{ fontSize: '12px', padding: '8px 18px', fontWeight: 700, gap: '6px' }}
                       >
-                        {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
-                        {copied ? 'COPIED' : 'COPY MARKDOWN'}
+                        <Download size={15} /> DOWNLOAD .MD
                       </button>
                       <button
                         className="btn-aarambh-outline"
-                        onClick={() => downloadSingle(activeItem.result!, 'md')}
-                        title="Download Markdown (.md)"
+                        onClick={() => copyMd(activeItem.result!.markdown)}
+                        title="Copy Markdown to Clipboard"
                       >
-                        <Download size={14} /> DOWNLOAD .MD
+                        {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
+                        {copied ? 'COPIED' : 'COPY MARKDOWN'}
                       </button>
                       <button
                         className="btn-aarambh-outline"
@@ -1978,7 +2001,7 @@ $$`}
                         <FileCheck size={14} /> PDF
                       </button>
                       <button
-                        className="btn-aarambh-primary"
+                        className="btn-aarambh-outline"
                         onClick={() => handleIndexToRag(activeItem)}
                       >
                         <MessageSquare size={14} /> CHAT IN RAG STUDIO

@@ -85,8 +85,8 @@ def _extract_text_and_layout(file_path: str, file_bytes: bytes, filename: str):
         except Exception:
             pass
 
-    if not page_texts:
-        page_texts = ["No extractable text found in uploaded document."]
+    if not page_texts or not any(t.strip() for t in page_texts):
+        page_texts = []
         page_count = max(1, page_count)
 
     # Detect headings, tables, and mathematical expressions
@@ -160,18 +160,14 @@ def _extract_text_and_layout(file_path: str, file_bytes: bytes, filename: str):
 
         flush_table()
         page_md = "\n".join(page_blocks).strip()
-        formatted_pages.append(f"<!-- Page {p_num} -->\n{page_md}")
+        if page_md:
+            formatted_pages.append(f"<!-- Page {p_num} -->\n{page_md}")
 
     file_md5 = hashlib.md5(file_bytes).hexdigest()
     file_sha256 = hashlib.sha256(file_bytes).hexdigest()
 
-    header_block = (
-        f"# {clean_title}\n\n"
-        f"> **Engine:** Local Docling Layout Parser (Air-Gapped) · **Document:** `{filename}`\n"
-        f"> **MD5:** `{file_md5}` · **Pages:** {page_count} · **Size:** {len(file_bytes) / 1024:.1f} KB\n\n"
-    )
-
-    full_markdown = header_block + "\n\n---\n\n".join(formatted_pages)
+    valid_pages = [p for p in formatted_pages if p.strip()]
+    full_markdown = "\n\n---\n\n".join(valid_pages).strip() if valid_pages else ""
     return full_markdown, page_count, tables_detected, equations_detected, figures_detected, file_md5, file_sha256
 
 

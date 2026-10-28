@@ -433,6 +433,25 @@ async def convert_pdf(
         )
         conversion_duration_ms = int((time.perf_counter() - stage_started) * 1000)
 
+        if not text.strip():
+            if MARKER_AVAILABLE and chosen_engine != "surya":
+                logger.info("[%s] No selectable text found with %s. Attempting Marker OCR.", request_id, chosen_engine)
+                try:
+                    text, page_count = await run_in_threadpool(run_marker_conversion, upload_path, config_dict)
+                except Exception as ocr_e:
+                    logger.warning("[%s] Marker OCR error: %s", request_id, ocr_e)
+
+            if not text.strip():
+                return JSONResponse(
+                    status_code=422,
+                    content={
+                        "success": False,
+                        "error": "No selectable text or OCR content could be extracted from this PDF. The document appears to be an image-only scan or empty.",
+                        "fileMd5": file_md5,
+                        "fileSha256": file_sha256,
+                    }
+                )
+
         stage_started = time.perf_counter()
         count_model = target_model or "gpt-4.1"
         try:

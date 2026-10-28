@@ -194,6 +194,8 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
   md5: string
   charCount: number
   wordCount: number
+  isScanned: boolean
+  error?: string
 }> {
   const buffer = await file.arrayBuffer()
   const bytes = new Uint8Array(buffer)
@@ -321,24 +323,12 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
       structured.push(currentParagraph.join(' '))
     }
 
-    bodyMd = structured.join('\n\n')
-  } else {
-    // Authentic report if PDF contains only non-text raster scans or encrypted streams
-    bodyMd = `## Document Overview & Verification\n\n` +
-      `Extracted from **${file.name}** across **${pageCount} pages** with cryptographic integrity verified.\n\n` +
-      `- **Original Size:** ${(file.size / 1024).toFixed(1)} KB\n` +
-      `- **Cryptographic MD5:** \`${md5}\`\n` +
-      `- **Extraction Mode:** Visual Layer Inspection (Air-Gapped)\n\n` +
-      `> **Notice:** This document appears to contain photographic scans or vector raster images. ` +
-      `Start the local neural OCR backend to run full pixel-level OCR extraction.`
+    bodyMd = structured.join('\n\n').trim()
   }
 
-  const header = `# ${docTitle}\n\n` +
-    `> **File:** \`${file.name}\` · **Pages:** ${pageCount} · **Size:** ${(file.size / 1024).toFixed(1)} KB\n` +
-    `> **Cryptographic MD5:** \`${md5}\` · **Privacy:** 100% Air-Gapped\n\n`
-
-  const fullMarkdown = header + bodyMd
-  const words = fullMarkdown.split(/\s+/).filter(Boolean).length
+  const isScanned = extractedLines.length === 0 || bodyMd.length < 10
+  const fullMarkdown = isScanned ? '' : bodyMd
+  const words = fullMarkdown ? fullMarkdown.split(/\s+/).filter(Boolean).length : 0
 
   return {
     markdown: fullMarkdown,
@@ -346,6 +336,10 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
     md5,
     charCount: fullMarkdown.length,
     wordCount: words,
+    isScanned,
+    error: isScanned
+      ? 'No selectable text could be extracted from this PDF. The document appears to be a scanned image or photo PDF. Please enable OCR processing.'
+      : undefined,
   }
 }
 
