@@ -197,25 +197,96 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
   const bytes = new Uint8Array(buffer)
   const md5 = computeBytesMd5(bytes)
 
+  let docTitle = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim()
+
+  // 1. Primary: Use PDF.js for 100% Comprehensive Multi-Page Extraction
+  try {
+    const pdfjsLib = await import('pdfjs-dist')
+    if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '6.4.299'}/build/pdf.worker.min.mjs`
+    }
+    const loadingTask = pdfjsLib.getDocument({
+      data: bytes,
+      useSystemFonts: true,
+      isEvalSupported: false,
+    })
+    const pdf = await loadingTask.promise
+    const numPages = pdf.numPages
+
+    try {
+      const meta = await pdf.getMetadata()
+      if (meta?.info && typeof meta.info === 'object' && 'Title' in meta.info && meta.info.Title) {
+        const t = String(meta.info.Title).trim()
+        if (t) docTitle = t
+      }
+    } catch {}
+
+    const pageBlocks: string[] = []
+    let totalTextChars = 0
+
+    for (let p = 1; p <= numPages; p++) {
+      const page = await pdf.getPage(p)
+      const textContent = await page.getTextContent()
+      const items = textContent.items as Array<{ str: string; hasEOL?: boolean }>
+
+      const lines: string[] = []
+      let currentLine: string[] = []
+
+      for (const item of items) {
+        if (item.str && item.str.trim()) {
+          currentLine.push(item.str.trim())
+          totalTextChars += item.str.trim().length
+        }
+        if (item.hasEOL || currentLine.length >= 8) {
+          if (currentLine.length > 0) {
+            lines.push(currentLine.join(' '))
+            currentLine = []
+          }
+        }
+      }
+      if (currentLine.length > 0) {
+        lines.push(currentLine.join(' '))
+      }
+
+      const formattedLines: string[] = []
+      for (const l of lines) {
+        if (!l) continue
+        if (l.match(/^(?:[0-9]+(?:\.[0-9]+)*\s+[A-Z]|Chapter|Section|Abstract|Introduction|Executive Summary|Scope|Methodology|Conclusion|Recommendations|Appendix|Vulnerability Point)\b/i) || (l.length < 65 && l === l.toUpperCase() && l.length > 3)) {
+          formattedLines.push(`\n## ${l}\n`)
+        } else if (l.match(/^[•\*\-\–]\s+/)) {
+          formattedLines.push(l.replace(/^[•\*\-\–]\s+/, '- '))
+        } else {
+          formattedLines.push(l)
+        }
+      }
+
+      pageBlocks.push(`<!-- Page ${p} -->\n` + formattedLines.join('\n\n'))
+    }
+
+    if (totalTextChars > 50) {
+      const header = `# ${docTitle}\n\n` +
+        `> **Document:** \`${file.name}\` · **Format:** Markdown (.md) · **Pages:** ${numPages} · **Size:** ${(file.size / 1024).toFixed(1)} KB\n\n`
+      const fullMarkdown = header + pageBlocks.join('\n\n---\n\n')
+      return {
+        markdown: fullMarkdown,
+        pageCount: numPages,
+        md5,
+        charCount: fullMarkdown.length,
+        wordCount: fullMarkdown.split(/\s+/).filter(Boolean).length,
+      }
+    }
+  } catch (pdfJsErr) {
+    console.warn('PDF.js engine error, falling back to stream decompressor:', pdfJsErr)
+  }
+
   const latinStr = new TextDecoder('latin1').decode(bytes)
 
-  // 1. Detect Real Page Count
+  // 2. Secondary: Fallback to stream extraction if PDF.js is unavailable
   const pageMatches = latinStr.match(/\/Type\s*\/Page\b/g)
   const pageCount = Math.max(1, pageMatches ? pageMatches.length : 1)
 
-  // 2. Extract Document Title / Metadata from PDF Dictionary
-  let docTitle = ''
-  const titleMatch = latinStr.match(/\/Title\s*\(([^)]+)\)/i)
-  if (titleMatch && titleMatch[1]) {
-    docTitle = cleanPdfString(titleMatch[1])
-  }
-  if (!docTitle) {
-    docTitle = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim()
-  }
-
   const extractedLines: string[] = []
 
-  // 3. Scan & Decompress Binary Flate Streams
   const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g
   let streamMatch: RegExpExecArray | null
 
@@ -223,7 +294,6 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
     const rawStreamStr = streamMatch[1]
     if (rawStreamStr.length < 10) continue
 
-    // Convert raw latin1 characters to Uint8Array bytes
     const streamBytes = new Uint8Array(rawStreamStr.length)
     for (let i = 0; i < rawStreamStr.length; i++) {
       streamBytes[i] = rawStreamStr.charCodeAt(i) & 0xff
@@ -232,14 +302,12 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
     const decompressed = await decompressFlateBytes(streamBytes)
     const content = decompressed || rawStreamStr
 
-    // Extract literal text Tj
     const tjMatches = content.matchAll(/\(([^)]+)\)\s*Tj/g)
     for (const m of tjMatches) {
       const s = cleanPdfString(m[1])
       if (s.length > 0) extractedLines.push(s)
     }
 
-    // Extract array text TJ
     const arrayMatches = content.matchAll(/\[(.*?)\]\s*TJ/g)
     for (const arrMatch of arrayMatches) {
       const inner = arrMatch[1]
@@ -249,7 +317,6 @@ export async function extractPdfTextInBrowser(file: File): Promise<{
       if (s.length > 0) extractedLines.push(s)
     }
 
-    // Extract Hexadecimal Text <48656c6c6f> Tj
     const hexMatches = content.matchAll(/<([0-9a-fA-F\s]+)>\s*Tj/g)
     for (const hMatch of hexMatches) {
       const hex = hMatch[1].replace(/\s+/g, '')
