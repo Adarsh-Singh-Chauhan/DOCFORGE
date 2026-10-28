@@ -171,6 +171,86 @@ def test_7_empty_or_no_readable_text():
     print(f"[PASS] Empty File Handling: Accurately reported 'No readable text was detected' without fake content.")
 
 
+from pdqa_api.export_engine import generate_vector_pdf, generate_word_doc
+from fastapi.testclient import TestClient
+from pdqa_api.main import app
+
+
+def test_8_genuine_vector_pdf_export():
+    print("\n--- Test 8: Genuine Vector PDF Export Generation & Selectable Text ---")
+    sample_md = """# Technical Specification Document
+## Overview
+DOCFORGE provides client-side and backend vector PDF generation.
+
+* Selectable Helvetica typography
+* High-contrast headings and borders
+* Multi-column table grids
+
+### Metrics
+| Component | Status | Latency |
+| Parser | Operational | 42ms |
+| OCR Engine | Operational | 110ms |
+
+```bash
+docforge convert --all --format=pdf
+```
+
+<!-- Page 2 -->
+# Page 2: Analytical Formulations
+Mathematical notation:
+$$\\nabla \\times \\mathbf{B} = \\mu_0 \\mathbf{J} + \\mu_0 \\epsilon_0 \\frac{\\partial \\mathbf{E}}{\\partial t}$$
+Complete document extraction with zero data corruption.
+"""
+    pdf_bytes = generate_vector_pdf("Technical Specification", sample_md)
+    assert pdf_bytes.startswith(b"%PDF-1.4"), "Must start with %PDF-1.4 header"
+    assert b"%%EOF" in pdf_bytes[-25:], "Must have valid PDF EOF marker"
+    
+    # Parse with PyPDF
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    assert len(reader.pages) == 2, f"Expected 2 pages in exported PDF, got {len(reader.pages)}"
+    
+    p1_text = reader.pages[0].extract_text()
+    p2_text = reader.pages[1].extract_text()
+    assert "DOCFORGE" in p1_text and "Technical Specification" in p1_text, "Page 1 missing expected vector text"
+    assert "Analytical Formulations" in p2_text or "Page 2" in p2_text, "Page 2 missing expected vector text"
+    print(f"[PASS] Vector PDF Export: Valid %PDF-1.4, 2 pages, selectable text verified via PyPDF.")
+
+
+def test_9_backend_export_and_convert_endpoints():
+    print("\n--- Test 9: Backend Export & Convert Endpoints ---")
+    client = TestClient(app)
+    
+    # Test export PDF
+    res_pdf = client.post("/api/export/pdf", json={
+        "title": "API Test Document",
+        "filename": "api_test.pdf",
+        "markdown": "# API Test\n\nTesting the backend PDF export endpoint.\n\n* Item 1\n* Item 2"
+    })
+    assert res_pdf.status_code == 200, f"Export PDF failed: {res_pdf.status_code}"
+    assert res_pdf.headers["content-type"] == "application/pdf"
+    assert res_pdf.content.startswith(b"%PDF-1.4")
+    
+    # Test export Docx / Doc
+    res_doc = client.post("/api/export/doc", json={
+        "title": "API Test Document",
+        "filename": "api_test.doc",
+        "markdown": "# API Test\n\nWord export test."
+    })
+    assert res_doc.status_code == 200, f"Export Doc failed: {res_doc.status_code}"
+    assert "application/msword" in res_doc.headers["content-type"]
+    assert b"xmlns:w" in res_doc.content
+    
+    # Test export Markdown
+    res_md = client.post("/api/export/markdown", json={
+        "filename": "api_test.md",
+        "markdown": "# Extracted Content\n\nValid UTF-8 content."
+    })
+    assert res_md.status_code == 200
+    assert "text/markdown" in res_md.headers["content-type"]
+    assert res_md.content == b"# Extracted Content\n\nValid UTF-8 content."
+    print(f"[PASS] Backend Export Endpoints: /api/export/pdf, /api/export/doc, /api/export/markdown verified.")
+
+
 if __name__ == "__main__":
     test_1_digital_pdf()
     test_2_scanned_pdf()
@@ -179,6 +259,9 @@ if __name__ == "__main__":
     test_5_identical_file_reupload()
     test_6_large_multipage_pdf()
     test_7_empty_or_no_readable_text()
+    test_8_genuine_vector_pdf_export()
+    test_9_backend_export_and_convert_endpoints()
     print("\n==============================================")
-    print("ALL 7 MANDATORY VERIFICATION TESTS PASSED 100%!")
+    print("ALL 9 MANDATORY VERIFICATION TESTS PASSED 100%!")
     print("==============================================")
+

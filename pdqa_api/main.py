@@ -51,6 +51,7 @@ from pdqa_api.db import (
     update_conversation_title, delete_conversation, add_chat_message,
     log_api_usage, get_dashboard_metrics, get_engine_performance_report
 )
+from pdqa_api.export_engine import generate_vector_pdf, generate_word_doc
 
 logger = logging.getLogger("pdqa_api")
 load_dotenv(Path(__file__).with_name(".env"), override=False)
@@ -630,6 +631,48 @@ async def convert_pdf(
                 os.remove(upload_path)
             except Exception:
                 logger.exception("[%s] failed to remove uploaded temporary PDF", request_id)
+
+class ExportRequest(BaseModel):
+    markdown: str
+    title: Optional[str] = "Document"
+    filename: Optional[str] = "document"
+
+
+@app.post("/api/export/pdf")
+async def export_pdf_endpoint(req: ExportRequest):
+    """Generate and return a genuine vector PDF (PDF-1.4) from Markdown content."""
+    base_name = os.path.splitext(req.filename or "document")[0] or "document"
+    pdf_bytes = generate_vector_pdf(req.title or base_name, req.markdown)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{base_name}-converted.pdf"',
+        "Content-Type": "application/pdf",
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+@app.post("/api/export/docx")
+@app.post("/api/export/doc")
+async def export_doc_endpoint(req: ExportRequest):
+    """Export formatted Word document (.doc) preserving structure, tables, and typography."""
+    base_name = os.path.splitext(req.filename or "document")[0] or "document"
+    doc_bytes = generate_word_doc(req.title or base_name, req.markdown)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{base_name}.doc"',
+        "Content-Type": "application/msword",
+    }
+    return Response(content=doc_bytes, media_type="application/msword", headers=headers)
+
+
+@app.post("/api/export/markdown")
+async def export_markdown_endpoint(req: ExportRequest):
+    """Return complete extracted Markdown as a UTF-8 file."""
+    base_name = os.path.splitext(req.filename or "document")[0] or "document"
+    md_bytes = req.markdown.encode("utf-8")
+    headers = {
+        "Content-Disposition": f'attachment; filename="{base_name}.md"',
+        "Content-Type": "text/markdown; charset=utf-8",
+    }
+    return Response(content=md_bytes, media_type="text/markdown; charset=utf-8", headers=headers)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

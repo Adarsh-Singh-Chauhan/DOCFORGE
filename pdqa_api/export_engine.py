@@ -1,12 +1,22 @@
+"""High-fidelity document export engine for DOCFORGE.
+Generates genuine vector PDF documents (PDF-1.4) and Word documents from extracted Markdown.
+"""
+
+from __future__ import annotations
+
 import io
 import re
-from pypdf import PdfReader
+from typing import Optional
+
 
 def escape_pdf_text(text: str) -> str:
+    """Sanitize and escape text for standard PDF literal strings."""
     cleaned = "".join(ch if 32 <= ord(ch) <= 126 else " " for ch in text)
     return cleaned.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
+
 def generate_vector_pdf(title: str, markdown: str) -> bytes:
+    """Generate a genuine %PDF-1.4 vector document with headers, footers, tables, and typography."""
     raw_lines = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     pages_ops: list[list[str]] = [[]]
     cur_page_idx = 0
@@ -65,12 +75,18 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
             y_box = cur_y - row_height + 4
             # Row background
             if r_idx == 0:
-                pages_ops[cur_page_idx].append(f"0.92 0.94 0.98 rg {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {row_height:.2f} re f")
+                pages_ops[cur_page_idx].append(
+                    f"0.92 0.94 0.98 rg {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {row_height:.2f} re f"
+                )
             elif r_idx % 2 == 1:
-                pages_ops[cur_page_idx].append(f"0.97 0.98 0.99 rg {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {row_height:.2f} re f")
-            
+                pages_ops[cur_page_idx].append(
+                    f"0.97 0.98 0.99 rg {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {row_height:.2f} re f"
+                )
+
             # Row borders
-            pages_ops[cur_page_idx].append(f"0.80 0.83 0.88 RG 0.5 w {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {row_height:.2f} re S")
+            pages_ops[cur_page_idx].append(
+                f"0.80 0.83 0.88 RG 0.5 w {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {row_height:.2f} re S"
+            )
 
             font = "/F2 8.5" if r_idx == 0 else "/F1 8.5"
             text_color = "0.08 0.12 0.22" if r_idx == 0 else "0.15 0.20 0.30"
@@ -78,7 +94,9 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
                 cell_text = row[c_idx] if c_idx < len(row) else ""
                 cell_x = margin_x + (c_idx * col_width) + 4
                 esc = escape_pdf_text(cell_text)[: int(col_width / 5.5)]
-                pages_ops[cur_page_idx].append(f"BT {font} Tf {text_color} rg {cell_x:.2f} {cur_y - 8:.2f} Td ({esc}) Tj ET")
+                pages_ops[cur_page_idx].append(
+                    f"BT {font} Tf {text_color} rg {cell_x:.2f} {cur_y - 8:.2f} Td ({esc}) Tj ET"
+                )
             cur_y -= row_height
         cur_y -= 8
         table_buffer.clear()
@@ -90,13 +108,19 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
         block_height = len(code_buffer) * 13.0 + 12.0
         check_page_space(min(block_height, 250.0))
         y_box = cur_y - block_height + 10
-        pages_ops[cur_page_idx].append(f"0.94 0.95 0.97 rg {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {block_height:.2f} re f")
-        pages_ops[cur_page_idx].append(f"0.82 0.84 0.88 RG 0.5 w {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {block_height:.2f} re S")
+        pages_ops[cur_page_idx].append(
+            f"0.94 0.95 0.97 rg {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {block_height:.2f} re f"
+        )
+        pages_ops[cur_page_idx].append(
+            f"0.82 0.84 0.88 RG 0.5 w {margin_x:.2f} {y_box:.2f} {max_content_width:.2f} {block_height:.2f} re S"
+        )
         cur_y -= 8
         for cl in code_buffer:
             check_page_space(14)
             esc = escape_pdf_text(cl)[:95]
-            pages_ops[cur_page_idx].append(f"BT /F4 8.5 Tf 0.15 0.20 0.30 rg {margin_x + 8:.2f} {cur_y:.2f} Td ({esc}) Tj ET")
+            pages_ops[cur_page_idx].append(
+                f"BT /F4 8.5 Tf 0.15 0.20 0.30 rg {margin_x + 8:.2f} {cur_y:.2f} Td ({esc}) Tj ET"
+            )
             cur_y -= 13
         cur_y -= 10
         code_buffer.clear()
@@ -138,9 +162,13 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
             check_page_space(35)
             cur_y -= 12
             text = escape_pdf_text(line[2:].strip())
-            pages_ops[cur_page_idx].append(f"BT /F2 16 Tf 0.06 0.09 0.16 rg {margin_x:.2f} {cur_y:.2f} Td ({text}) Tj ET")
+            pages_ops[cur_page_idx].append(
+                f"BT /F2 16 Tf 0.06 0.09 0.16 rg {margin_x:.2f} {cur_y:.2f} Td ({text}) Tj ET"
+            )
             cur_y -= 20
-            pages_ops[cur_page_idx].append(f"0.88 0.31 0.09 RG 1.5 w {margin_x:.2f} {cur_y + 8:.2f} m {margin_x + 60:.2f} {cur_y + 8:.2f} l S")
+            pages_ops[cur_page_idx].append(
+                f"0.88 0.31 0.09 RG 1.5 w {margin_x:.2f} {cur_y + 8:.2f} m {margin_x + 60:.2f} {cur_y + 8:.2f} l S"
+            )
             cur_y -= 6
             continue
 
@@ -149,7 +177,9 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
             check_page_space(28)
             cur_y -= 10
             text = escape_pdf_text(line[3:].strip())
-            pages_ops[cur_page_idx].append(f"BT /F2 12.5 Tf 0.12 0.16 0.24 rg {margin_x:.2f} {cur_y:.2f} Td ({text}) Tj ET")
+            pages_ops[cur_page_idx].append(
+                f"BT /F2 12.5 Tf 0.12 0.16 0.24 rg {margin_x:.2f} {cur_y:.2f} Td ({text}) Tj ET"
+            )
             cur_y -= 16
             continue
 
@@ -158,7 +188,9 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
             check_page_space(22)
             cur_y -= 8
             text = escape_pdf_text(line[4:].strip())
-            pages_ops[cur_page_idx].append(f"BT /F2 10.5 Tf 0.20 0.25 0.35 rg {margin_x:.2f} {cur_y:.2f} Td ({text}) Tj ET")
+            pages_ops[cur_page_idx].append(
+                f"BT /F2 10.5 Tf 0.20 0.25 0.35 rg {margin_x:.2f} {cur_y:.2f} Td ({text}) Tj ET"
+            )
             cur_y -= 14
             continue
 
@@ -168,9 +200,13 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
             wrapped = wrap_text(q_text, 76)
             q_height = len(wrapped) * 13.0 + 6.0
             check_page_space(q_height)
-            pages_ops[cur_page_idx].append(f"0.88 0.31 0.09 rg {margin_x:.2f} {cur_y - q_height + 11:.2f} 3 {q_height:.2f} re f")
+            pages_ops[cur_page_idx].append(
+                f"0.88 0.31 0.09 rg {margin_x:.2f} {cur_y - q_height + 11:.2f} 3 {q_height:.2f} re f"
+            )
             for wl in wrapped:
-                pages_ops[cur_page_idx].append(f"BT /F3 9.5 Tf 0.45 0.25 0.10 rg {margin_x + 10:.2f} {cur_y:.2f} Td ({escape_pdf_text(wl)}) Tj ET")
+                pages_ops[cur_page_idx].append(
+                    f"BT /F3 9.5 Tf 0.45 0.25 0.10 rg {margin_x + 10:.2f} {cur_y:.2f} Td ({escape_pdf_text(wl)}) Tj ET"
+                )
                 cur_y -= 13
             cur_y -= 6
             continue
@@ -182,7 +218,9 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
             check_page_space(len(wrapped) * 13.0)
             for i, wl in enumerate(wrapped):
                 prefix = "* " if i == 0 else "  "
-                pages_ops[cur_page_idx].append(f"BT /F1 9.5 Tf 0.15 0.18 0.25 rg {margin_x + 10:.2f} {cur_y:.2f} Td ({escape_pdf_text(prefix + wl)}) Tj ET")
+                pages_ops[cur_page_idx].append(
+                    f"BT /F1 9.5 Tf 0.15 0.18 0.25 rg {margin_x + 10:.2f} {cur_y:.2f} Td ({escape_pdf_text(prefix + wl)}) Tj ET"
+                )
                 cur_y -= 13
             continue
 
@@ -190,7 +228,9 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
         wrapped = wrap_text(line, 82)
         check_page_space(len(wrapped) * 13.0 + 4.0)
         for wl in wrapped:
-            pages_ops[cur_page_idx].append(f"BT /F1 9.5 Tf 0.15 0.18 0.25 rg {margin_x:.2f} {cur_y:.2f} Td ({escape_pdf_text(wl)}) Tj ET")
+            pages_ops[cur_page_idx].append(
+                f"BT /F1 9.5 Tf 0.15 0.18 0.25 rg {margin_x:.2f} {cur_y:.2f} Td ({escape_pdf_text(wl)}) Tj ET"
+            )
             cur_y -= 13
         cur_y -= 4
 
@@ -201,8 +241,15 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
     clean_title = escape_pdf_text(f"DOCFORGE STUDIO · {title}")[:60]
     for p_idx in range(total_pages):
         footer_text = escape_pdf_text(f"DOCFORGE Document Intelligence · Page {p_idx + 1} of {total_pages}")
-        pages_ops[p_idx].insert(0, f"0.85 0.85 0.88 RG 0.5 w {margin_x:.2f} 805 m {margin_x + max_content_width:.2f} 805 l S\nBT /F1 7.5 Tf 0.5 0.55 0.62 rg {margin_x:.2f} 812 Td ({clean_title}) Tj ET")
-        pages_ops[p_idx].append(f"0.85 0.85 0.88 RG 0.5 w {margin_x:.2f} 42 m {margin_x + max_content_width:.2f} 42 l S\nBT /F1 7.5 Tf 0.5 0.55 0.62 rg {margin_x + 160:.2f} 30 Td ({footer_text}) Tj ET")
+        pages_ops[p_idx].insert(
+            0,
+            f"0.85 0.85 0.88 RG 0.5 w {margin_x:.2f} 805 m {margin_x + max_content_width:.2f} 805 l S\n"
+            f"BT /F1 7.5 Tf 0.5 0.55 0.62 rg {margin_x:.2f} 812 Td ({clean_title}) Tj ET"
+        )
+        pages_ops[p_idx].append(
+            f"0.85 0.85 0.88 RG 0.5 w {margin_x:.2f} 42 m {margin_x + max_content_width:.2f} 42 l S\n"
+            f"BT /F1 7.5 Tf 0.5 0.55 0.62 rg {margin_x + 160:.2f} 30 Td ({footer_text}) Tj ET"
+        )
 
     parts: list[bytes] = []
     offsets: list[int] = [0]
@@ -247,48 +294,98 @@ def generate_vector_pdf(title: str, markdown: str) -> bytes:
 
     return b"".join(parts)
 
-# Test PDF generation and validation
-sample_md = """# Sample Technical Report
-## Introduction & Background
-This is a test of DOCFORGE vector PDF export engine.
-It preserves:
-* Headings and sub-headings
-* Bullet points and numbered items
-* Clean A4 page boundaries and margins
-* Vector fonts (Helvetica and Courier)
 
-> High-reliability document intelligence pipeline with zero truncation.
+def generate_word_doc(title: str, markdown: str) -> bytes:
+    """Generate a clean Word (.doc) document preserving headings, tables, code blocks and lists."""
+    html_lines = []
+    in_code = False
+    in_table = False
+    table_rows = []
 
-### Performance Benchmark Table
-| Metric | Baseline | DOCFORGE |
-| Accuracy | 92.4% | 99.8% |
-| Extraction Time | 14.2s | 1.8s |
-| Memory Overhead | 850MB | 120MB |
+    for raw_line in markdown.replace("\r\n", "\n").split("\n"):
+        line = raw_line.strip()
+        if line.startswith("```"):
+            if in_code:
+                html_lines.append("</pre>")
+                in_code = False
+            else:
+                html_lines.append("<pre style='background:#f4f5f8;padding:12px;border:1px solid #e2e8f0;font-family:monospace;border-radius:4px;'>")
+                in_code = True
+            continue
 
-```python
-def verify_pipeline():
-    assert True == True
-    return "All systems operational"
-```
+        if in_code:
+            html_lines.append(f"<code>{escape_html(raw_line)}</code><br/>")
+            continue
 
-<!-- Page 2 -->
-# Section 2: Mathematical Formulations
-Equations and formulas:
-E = mc^2 and Gaussian distribution:
-f(x) = 1 / (sigma * sqrt(2 * pi)) * exp(- (x - mu)^2 / (2 * sigma^2))
+        if line.startswith("|") and line.endswith("|"):
+            if "---" in line:
+                continue
+            cells = [c.strip() for c in line.split("|")[1:-1]]
+            if not in_table:
+                html_lines.append("<table border='1' cellspacing='0' cellpadding='6' style='border-collapse:collapse;width:100%;margin:16px 0;border:1px solid #cbd5e1;'>")
+                in_table = True
+                html_lines.append("<tr style='background:#f1f5f9;font-weight:bold;'>" + "".join(f"<th>{escape_html(c)}</th>" for c in cells) + "</tr>")
+            else:
+                html_lines.append("<tr>" + "".join(f"<td>{escape_html(c)}</td>" for c in cells) + "</tr>")
+            continue
+        elif in_table:
+            html_lines.append("</table>")
+            in_table = False
 
-The document concludes with verified extraction completeness.
-"""
+        if not line:
+            continue
 
-pdf_bytes = generate_vector_pdf("Sample Technical Report", sample_md)
-print(f"Generated PDF bytes length: {len(pdf_bytes)}")
-assert pdf_bytes.startswith(b"%PDF-1.4"), "Invalid PDF header!"
-assert pdf_bytes.endswith(b"%%EOF\n") or b"%%EOF" in pdf_bytes[-20:], "Invalid PDF trailer!"
+        if line.startswith("# "):
+            html_lines.append(f"<h1 style='color:#0f172a;border-bottom:2px solid #ea580c;padding-bottom:6px;'>{escape_html(line[2:])}</h1>")
+        elif line.startswith("## "):
+            html_lines.append(f"<h2 style='color:#1e293b;'>{escape_html(line[3:])}</h2>")
+        elif line.startswith("### "):
+            html_lines.append(f"<h3 style='color:#334155;'>{escape_html(line[4:])}</h3>")
+        elif line.startswith(">"):
+            html_lines.append(f"<blockquote style='border-left:4px solid #ea580c;padding-left:12px;color:#64748b;font-style:italic;'>{escape_html(line.lstrip('> '))}</blockquote>")
+        elif re.match(r"^[\*\-]\s+", line):
+            html_lines.append(f"<li style='margin-left:20px;color:#334155;'>{escape_html(re.sub(r'^[\*\-]\s+', '', line))}</li>")
+        else:
+            html_lines.append(f"<p style='color:#1e293b;line-height:1.6;'>{escape_html(line)}</p>")
 
-reader = PdfReader(io.BytesIO(pdf_bytes))
-print(f"PdfReader parsed pages count: {len(reader.pages)}")
-for idx, page in enumerate(reader.pages):
-    extracted = page.extract_text()
-    print(f"Page {idx+1} text length: {len(extracted)}, snippet: {repr(extracted[:100])}")
+    if in_table:
+        html_lines.append("</table>")
+    if in_code:
+        html_lines.append("</pre>")
 
-print("VECTOR PDF VALIDATION SUCCESSFUL!")
+    doc_content = f"""<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>{escape_html(title)}</title>
+<style>
+body {{ font-family: 'Segoe UI', Calibri, Arial, sans-serif; font-size: 11pt; color: #1e293b; margin: 40px; }}
+h1 {{ font-size: 20pt; }}
+h2 {{ font-size: 15pt; }}
+h3 {{ font-size: 12pt; }}
+p {{ margin: 6pt 0; }}
+table {{ border: 1px solid #cbd5e1; }}
+td, th {{ border: 1px solid #cbd5e1; padding: 6px 10px; }}
+</style>
+</head>
+<body>
+<div style='border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 20px; color: #64748b; font-size: 9pt;'>
+DOCFORGE STUDIO · Document Intelligence
+</div>
+{''.join(html_lines)}
+<div style='border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 30px; color: #94a3b8; font-size: 8.5pt;'>
+Exported via DOCFORGE · High-Reliability Document Processing
+</div>
+</body>
+</html>"""
+    return doc_content.encode("utf-8")
+
+
+def escape_html(text: str) -> str:
+    """Escape HTML entities."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
