@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
-  ArrowLeft, Download, Copy, Check, MessageSquare, RotateCw, AlertTriangle
+  ArrowLeft, Download, Copy, Check, MessageSquare, RotateCw, AlertTriangle, FileText, FileCheck
 } from 'lucide-react'
 import type { OcrHistoryRecord } from '../types'
 import { fetchOcrJobDetail, retryOcrJob } from '../services/historyApi'
+import { downloadWordDoc, downloadPdfDocument } from '../utils/documentUtils'
 
 interface Props {
   jobId: string
@@ -156,8 +157,27 @@ export default function OcrJobDetailPage({ jobId, onBack, onOpenRagChatbot }: Pr
                     onClick={downloadMarkdown}
                     className="btn-aarambh-outline"
                     style={{ fontSize: '11px', padding: '8px 14px' }}
+                    title="Download Markdown (.md)"
                   >
-                    <Download size={13} /> DOWNLOAD .MD
+                    <Download size={13} /> .MD
+                  </button>
+
+                  <button
+                    onClick={() => downloadWordDoc(job.file_name, job.file_name, job.markdown || '')}
+                    className="btn-aarambh-outline"
+                    style={{ fontSize: '11px', padding: '8px 14px', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                    title="Download Microsoft Word Document (.doc)"
+                  >
+                    <FileText size={13} /> WORD (.DOC)
+                  </button>
+
+                  <button
+                    onClick={() => downloadPdfDocument(job.file_name, job.file_name, job.markdown || '')}
+                    className="btn-aarambh-outline"
+                    style={{ fontSize: '11px', padding: '8px 14px', color: '#e04f16', borderColor: 'rgba(224, 79, 22, 0.4)' }}
+                    title="Download / Print as PDF"
+                  >
+                    <FileCheck size={13} /> PDF
                   </button>
 
                   {onOpenRagChatbot && (
