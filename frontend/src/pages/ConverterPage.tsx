@@ -2249,11 +2249,15 @@ $$`}
           </div>
 
           <div className="aarambh-footer__bottom">
-            <div>
-              DOCFORGE · 100% AIR-GAPPED & LOCAL DOCUMENT INTELLIGENCE
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span>DOCFORGE · 100% AIR-GAPPED DOCUMENT INTELLIGENCE & VECTOR EXPORT</span>
+              <span>•</span>
+              <span><strong>Team Leader:</strong> Ansh</span>
+              <span>•</span>
+              <span><strong>Core Architect:</strong> Adarsh Singh Chauhan</span>
             </div>
             <div>
-              AIR-GAPPED ARCHITECTURE · <span style={{ color: 'var(--accent)', fontWeight: 700 }}>100% PRIVATE</span>
+              CRYPTOGRAPHIC MD5 PROVENANCE · <span style={{ color: 'var(--accent)', fontWeight: 700 }}>100% VERIFIED</span>
             </div>
           </div>
         </div>
